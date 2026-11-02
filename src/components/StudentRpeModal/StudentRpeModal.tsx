@@ -33,7 +33,7 @@ function metricTypeLabel(raw?: string): string {
   const norm = normalizeMetricType(raw);
   switch (norm) {
     case "TEMPO":
-      return "Tempo (mm:ss)";
+      return "Tempo (mm:ss ou hh:mm:ss)";
     case "FREQUENCIA_CARDIACA":
       return "Frequência cardíaca (bpm)";
     case "TEXTO":
@@ -47,7 +47,7 @@ function metricPlaceholder(raw?: string): string {
   const norm = normalizeMetricType(raw);
   switch (norm) {
     case "TEMPO":
-      return "Ex.: 01:42";
+      return "Ex.: 01:42 ou 01:15:30";
     case "FREQUENCIA_CARDIACA":
       return "Ex.: 152 (entre 30 e 250)";
     case "TEXTO":
@@ -79,8 +79,8 @@ function validateStudentMetricValue(metric: StudentExecutionMetricDTO, rawValue:
       return `Valor inválido para a métrica ${metric.titulo}. Verifique o formato esperado: deve ser numérico.`;
     }
   } else if (norm === "TEMPO") {
-    if (!/^\d+:[0-5]\d$/.test(trimmed)) {
-      return `Valor inválido para a métrica ${metric.titulo}. Verifique o formato esperado: mm:ss (ex.: 01:42).`;
+    if (!/^(?:\d+:[0-5]\d:[0-5]\d|\d+:[0-5]\d)$/.test(trimmed)) {
+      return `Valor inválido para a métrica ${metric.titulo}. Verifique o formato esperado: mm:ss ou hh:mm:ss (ex.: 01:42 ou 01:15:30).`;
     }
   } else if (norm === "FREQUENCIA_CARDIACA") {
     const bpm = Number(trimmed);
@@ -96,7 +96,12 @@ function serializeStudentMetricValue(rawType: string, rawValue: string): string 
   const trimmed = rawValue.trim();
   const norm = normalizeMetricType(rawType);
   if (norm === "TEMPO") {
-    const [min, sec] = trimmed.split(":");
+    const parts = trimmed.split(":");
+    if (parts.length === 3) {
+      const [h, m, s] = parts;
+      return `${(h || "0").padStart(2, "0")}:${(m || "0").padStart(2, "0")}:${s || "00"}`;
+    }
+    const [min, sec] = parts;
     return `${(min || "0").padStart(2, "0")}:${sec || "00"}`;
   }
   if (norm === "NUMERICO") {

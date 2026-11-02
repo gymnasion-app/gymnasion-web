@@ -61,7 +61,7 @@ export const METRIC_TYPE_OPTIONS: MetricTypeOption[] = [
   {
     value: "TEMPO",
     title: "Tempo / Cronômetro",
-    subtitle: "Formato mm:ss · calcula ritmo médio",
+    subtitle: "Formato mm:ss ou hh:mm:ss · calcula ritmo médio",
   },
   {
     value: "FREQUENCIA_CARDIACA",
@@ -86,7 +86,7 @@ export function getMetricTypeDetails(tipo: TipoMetrica | string): {
       return {
         key: "TEMPO",
         title: "Tempo / Cronômetro",
-        subtitle: "Formato mm:ss · calcula ritmo médio",
+        subtitle: "Formato mm:ss ou hh:mm:ss · calcula ritmo médio",
       };
     case "FREQUENCIA_CARDIACA":
       return {
@@ -122,6 +122,7 @@ export function isMetricDuplicate(
     (m) =>
       m.id !== currentMetricId &&
       m.modalidadeId === modalidadeId &&
+      isMetricActive(m) &&
       normalizeText(m.titulo) === clean
   );
 }
