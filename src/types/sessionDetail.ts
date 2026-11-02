@@ -39,14 +39,19 @@ export interface DesempenhoDetalheResponse {
 export interface AuditoriaDesempenhoItem {
   id: string;
   tipoOperacao: "INCLUSAO" | "CORRECAO";
+  tipoAlteracao?: "INCLUSAO" | "CORRECAO";
   campo: "DATA_REAL" | "OBSERVACOES" | "METRICA";
   metricaId?: string | null;
   tituloMetrica?: string | null;
+  metricaTitulo?: string | null;
   valorAnterior?: string | null;
   valorNovo?: string | null;
   usuarioId: string;
   nomeUsuario: string;
+  responsavelNome?: string;
+  responsavelRole?: string;
   dataHora: string;
+  dataHoraAlteracao?: string;
 }
 
 export interface CorrigirDesempenhoPayload {

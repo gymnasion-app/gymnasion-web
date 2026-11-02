@@ -291,6 +291,7 @@ export default function StudentRpeModal({
     if (!resolvedSessionId) return;
     let active = true;
     setLoadingForm(true);
+    setFormError("");
     alunoService
       .obterFormularioExecucao(resolvedSessionId)
       .then((form) => {
@@ -302,8 +303,12 @@ export default function StudentRpeModal({
           setDuration(String(form.sessao.duracao));
         }
       })
-      .catch(() => {
-        // Fallback para métricas já carregadas na rotina ativa
+      .catch((err: unknown) => {
+        if (!active) return;
+        const axiosErr = err as { response?: { status?: number; data?: { detail?: string } } };
+        if (axiosErr?.response?.status === 422 && axiosErr.response.data?.detail) {
+          setFormError(axiosErr.response.data.detail);
+        }
       })
       .finally(() => {
         if (active) setLoadingForm(false);
@@ -431,6 +436,9 @@ export default function StudentRpeModal({
     }
 
     setErrors(nextErrors);
+    if (formError) {
+      return false;
+    }
     setFormError("");
     return Object.keys(nextErrors).length === 0;
   }
