@@ -80,17 +80,17 @@ export default function SessionAuditModal({ sessionId, onClose }: SessionAuditMo
               {items.map((item) => (
                 <div key={item.id} className="audit-modal__card">
                   <div className="audit-modal__card-top">
-                    <Badge tone={item.tipoOperacao === "INCLUSAO" ? "success" : "warning"}>
-                      {item.tipoOperacao === "INCLUSAO" ? "Inclusão" : "Correção"}
+                    <Badge tone={(item.tipoAlteracao || item.tipoOperacao) === "INCLUSAO" ? "success" : "warning"}>
+                      {(item.tipoAlteracao || item.tipoOperacao) === "INCLUSAO" ? "Inclusão" : "Correção"}
                     </Badge>
-                    <span className="audit-modal__date">{formatDateTime(item.dataHora)}</span>
+                    <span className="audit-modal__date">{formatDateTime(item.dataHoraAlteracao || item.dataHora)}</span>
                   </div>
 
                   <div className="audit-modal__card-field">
                     <strong>Campo: </strong>
                     <span>
                       {item.campo === "METRICA"
-                        ? item.tituloMetrica || "Métrica"
+                        ? item.metricaTitulo || item.tituloMetrica || "Métrica"
                         : item.campo === "DATA_REAL"
                         ? "Data real de execução"
                         : "Observações"}
@@ -112,7 +112,12 @@ export default function SessionAuditModal({ sessionId, onClose }: SessionAuditMo
 
                   <div className="audit-modal__author">
                     <span>Alterado por: </span>
-                    <strong>{item.nomeUsuario}</strong>
+                    <strong>{item.responsavelNome || item.nomeUsuario}</strong>
+                    {item.responsavelRole && (
+                      <span className="audit-modal__role" style={{ marginLeft: "6px", color: "var(--color-text-muted, #64748b)", fontSize: "0.8125rem" }}>
+                        ({item.responsavelRole.includes("PERSONAL") ? "Personal Trainer" : "Aluno"})
+                      </span>
+                    )}
                   </div>
                 </div>
               ))}

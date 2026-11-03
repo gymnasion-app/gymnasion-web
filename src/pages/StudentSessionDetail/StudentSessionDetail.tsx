@@ -436,7 +436,7 @@ export default function StudentSessionDetail() {
                 const inputId = `pending-input-${pm.metricaId}`;
                 const placeholder =
                   pm.tipo === "TEMPO"
-                    ? "Ex.: 01:42 (mm:ss)"
+                    ? "Ex.: 01:42 (mm:ss ou hh:mm:ss)"
                     : pm.tipo === "FREQUENCIA_CARDIACA"
                     ? "Ex.: 152 (entre 30 e 250 bpm)"
                     : pm.tipo === "NUMERICO"

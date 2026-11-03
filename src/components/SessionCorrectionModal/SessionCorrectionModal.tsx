@@ -126,7 +126,7 @@ export default function SessionCorrectionModal({
                       }
                       placeholder={
                         m.tipo === "TEMPO"
-                          ? "mm:ss (ex.: 01:42)"
+                          ? "mm:ss ou hh:mm:ss (ex.: 01:42 ou 01:15:30)"
                           : m.tipo === "FREQUENCIA_CARDIACA"
                           ? "Entre 30 e 250 bpm"
                           : "Informe o valor"

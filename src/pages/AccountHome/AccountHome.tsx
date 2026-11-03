@@ -14,6 +14,11 @@ import "./AccountHome.css";
 
 function parseMetricNumericValue(raw: string): number | null {
   const trimmed = raw.trim();
+  // Tempo hh:mm:ss -> segundos
+  const hmsMatch = /^(\d+):([0-5]\d):([0-5]\d)$/.exec(trimmed);
+  if (hmsMatch) {
+    return Number(hmsMatch[1]) * 3600 + Number(hmsMatch[2]) * 60 + Number(hmsMatch[3]);
+  }
   // Tempo mm:ss -> segundos
   const timeMatch = /^(\d{1,3}):([0-5]\d)$/.exec(trimmed);
   if (timeMatch) {
