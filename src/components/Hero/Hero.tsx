@@ -20,7 +20,19 @@ export default function Hero() {
         </div>
       </div>
       <div className="institutional-hero__visual" aria-label="Exemplo de acompanhamento de alunos">
-        <img className="institutional-hero__photo" src="/institutional/imgPhoto.png" alt="Atleta treinando com halteres na academia" loading="eager" fetchpriority="high" />
+        <picture>
+          <source type="image/webp" srcSet="/institutional/imgPhoto.webp" />
+          <img
+            className="institutional-hero__photo"
+            src="/institutional/imgPhoto.png"
+            alt="Atleta treinando com halteres na academia"
+            loading="eager"
+            fetchPriority="high"
+            decoding="async"
+            width={956}
+            height={1400}
+          />
+        </picture>
         <div className="institutional-hero__chart">
           <div><strong>Ritmo 100m</strong><Badge>−8%</Badge></div>
           <p>1:42 /100m</p><img src="/institutional/imgChart.svg" alt="Gráfico ilustrativo da evolução do ritmo" />
