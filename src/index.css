@@ -36,6 +36,17 @@ body {
   outline-offset: 3px;
 }
 
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+[tabindex="-1"]:focus,
+[tabindex="-1"]:focus-visible,
+main:focus,
+main:focus-visible {
+  outline: none !important;
+}
+
 ::selection {
   background: var(--color-primary-100);
   color: var(--color-ink-900);

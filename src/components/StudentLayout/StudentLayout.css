@@ -35,6 +35,11 @@
   max-width: 100%;
 }
 
+#student-content:focus,
+#student-content:focus-visible {
+  outline: none;
+}
+
 .student-layout__skip {
   position: fixed;
   top: -100px;

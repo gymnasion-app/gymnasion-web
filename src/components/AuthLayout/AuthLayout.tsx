@@ -17,7 +17,18 @@ export default function AuthLayout({ children, variant }: { children: ReactNode;
     </div>
     <aside className="auth-layout__visual-side" aria-label="Conheça o Gymnasion">
       <div className="auth-layout__visual">
-        <img className="auth-layout__photo" src={`/auth/${variant}.png`} alt="" />
+        <picture>
+          <source type="image/webp" srcSet={`/auth/${variant}.webp`} />
+          <img
+            className="auth-layout__photo"
+            src={`/auth/${variant}.png`}
+            alt=""
+            fetchPriority="high"
+            decoding="async"
+            width={956}
+            height={1400}
+          />
+        </picture>
         <div className="auth-layout__visual-content">
           {variant !== "student" && <div className="auth-layout__sports">{["Natação", "Tênis", "Academia", "+ Corrida, Ciclismo…"].map(sport => <span key={sport}>{sport}</span>)}</div>}
           <h2>{variant === "student" ? "Seu treino começa aqui." : variant === "login" ? "Treinos inteligentes, evolução visível." : "Seu método, seus dados, sua evolução."}</h2>
