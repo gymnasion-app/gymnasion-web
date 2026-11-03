@@ -47,6 +47,11 @@
   left: 8px;
 }
 
+#personal-content:focus,
+#personal-content:focus-visible {
+  outline: none;
+}
+
 .personal-layout__strava {
   border-radius: 16px;
   padding: 16px;
