@@ -502,7 +502,7 @@ export default function RoutineSessionPlanner() {
             <SportTag sport={sportName} />
 
             <Badge tone={active ? "success" : "neutral"}>
-              {active ? "● Rotina ativa" : "● Rotina encerrada"}
+              {active ? "Rotina ativa" : "Rotina encerrada"}
             </Badge>
 
             <Badge tone="info">Meta: {targetFreq}× por semana</Badge>
@@ -587,10 +587,10 @@ export default function RoutineSessionPlanner() {
                   Faltam {targetFreq - plannedInWeek} para a meta semanal
                 </Badge>
               ) : plannedInWeek === targetFreq ? (
-                <Badge tone="success">● Meta semanal atingida</Badge>
+                <Badge tone="success">Meta semanal atingida</Badge>
               ) : (
                 <Badge tone="info">
-                  ● Meta atingida (+{plannedInWeek - targetFreq} sessão extra)
+                  Meta atingida (+{plannedInWeek - targetFreq} sessão extra)
                 </Badge>
               )}
             </div>
@@ -1115,11 +1115,11 @@ export default function RoutineSessionPlanner() {
                           <strong>{preview.headline}</strong>
                         </div>
                         {isValidated ? (
-                          <Badge tone="success">● Validada</Badge>
+                          <Badge tone="success">Validada</Badge>
                         ) : isDone ? (
-                          <Badge tone="warning">● Concluída</Badge>
+                          <Badge tone="warning">Concluída</Badge>
                         ) : (
-                          <Badge tone="neutral">● Planejada</Badge>
+                          <Badge tone="neutral">Planejada</Badge>
                         )}
                       </div>
 
