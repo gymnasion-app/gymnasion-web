@@ -8,6 +8,7 @@ import { getBorgInfo } from "../../features/studentArea/studentAreaModel";
 import { localDateKey } from "../../features/personal/dashboardModel";
 import { alunoService } from "../../services/alunoService";
 import { stravaService } from "../../services/stravaService";
+import { connectStravaWithPopup, STRAVA_STATUS_CHANGED } from "../../features/strava/connectWithPopup";
 import { authError } from "../../utils/authError";
 import type { StudentExecutionMetricDTO, StudentSessionMetricResult } from "../../types/studentArea";
 import type { StravaAtividade } from "../../types/strava";
@@ -339,21 +340,19 @@ export default function StudentRpeModal({
   async function handleConnectStravaFromModal() {
     try {
       setConnectingStrava(true);
-      const res = await stravaService.obterAuthUrl();
-      if (res.authUrl) {
-        window.location.href = res.authUrl;
-      }
+      await connectStravaWithPopup();
+      toast.success("Conta Strava conectada com sucesso.");
     } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível conectar ao Strava.");
+    } finally {
       setConnectingStrava(false);
-      const parsed = authError(err, "Não foi possível iniciar a conexão com o Strava.");
-      toast.error(parsed.message);
     }
   }
 
   // Carrega status e atividades do Strava (US-14 / US-22)
   useEffect(() => {
     let active = true;
-    async function initStrava() {
+    async function initStrava(selectFirstActivity: boolean) {
       try {
         setLoadingStrava(true);
         const status = await stravaService.obterStatus();
@@ -363,7 +362,7 @@ export default function StudentRpeModal({
           const acts = await stravaService.listarAtividades(10);
           if (!active) return;
           setStravaActivities(acts);
-          if (acts.length > 0) {
+          if (selectFirstActivity && acts.length > 0) {
             setSelectedStravaId(acts[0].id);
           }
         } else {
@@ -375,9 +374,14 @@ export default function StudentRpeModal({
         if (active) setLoadingStrava(false);
       }
     }
-    initStrava();
+    function refreshStrava() {
+      void initStrava(false);
+    }
+    void initStrava(true);
+    window.addEventListener(STRAVA_STATUS_CHANGED, refreshStrava);
     return () => {
       active = false;
+      window.removeEventListener(STRAVA_STATUS_CHANGED, refreshStrava);
     };
   }, []);
 
@@ -724,7 +728,7 @@ export default function StudentRpeModal({
                   textDecoration: "underline",
                 }}
               >
-                {connectingStrava ? "Conectando..." : "Conectar Strava →"}
+                {connectingStrava ? "Aguardando autorização..." : "Conectar Strava →"}
               </button>
             </div>
           )}

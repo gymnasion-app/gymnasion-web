@@ -8,6 +8,7 @@ import SportTag from "../../components/SportTag/SportTag";
 import StudentSmoothChart from "../../components/StudentSmoothChart/StudentSmoothChart";
 import { useStudentArea } from "../../features/studentArea/StudentContext";
 import { stravaService } from "../../services/stravaService";
+import { STRAVA_STATUS_CHANGED } from "../../features/strava/connectWithPopup";
 import type { StravaStatusResponse } from "../../types/strava";
 import { parseAtividades } from "../../utils/activityParser";
 import "./AccountHome.css";
@@ -51,10 +52,12 @@ export default function AccountHome() {
   const [stravaStatus, setStravaStatus] = useState<StravaStatusResponse | null>(null);
 
   useEffect(() => {
-    stravaService
-      .obterStatus()
-      .then(setStravaStatus)
-      .catch(() => {});
+    function refreshStravaStatus() {
+      void stravaService.obterStatus().then(setStravaStatus).catch(() => {});
+    }
+    refreshStravaStatus();
+    window.addEventListener(STRAVA_STATUS_CHANGED, refreshStravaStatus);
+    return () => window.removeEventListener(STRAVA_STATUS_CHANGED, refreshStravaStatus);
   }, []);
 
   useEffect(() => {
