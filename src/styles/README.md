@@ -2,7 +2,7 @@
 
 Fonte: [Identidade visual no Figma](https://www.figma.com/design/Kw1G5FRZa0zVp2UBwC3kXK/Prototipo---Projeto-de-Software?node-id=409-4876).
 
-`tokens.css` centraliza cores, tipografia, raios e sombras extraídos da identidade visual. É importado globalmente por `index.css`. A fonte variável Plus Jakarta Sans (pesos 400 a 800) é servida localmente pelo pacote `@fontsource-variable/plus-jakarta-sans`, importado em `main.tsx`.
+`tokens.css` centraliza cores, tipografia, raios e sombras extraídos da identidade visual. É importado globalmente por `index.css`. A fonte variável Montserrat é servida localmente pelo pacote `@fontsource-variable/montserrat`, importado em `main.tsx`.
 
 ## Uso nos próximos componentes
 
