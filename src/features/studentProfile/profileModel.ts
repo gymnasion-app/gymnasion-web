@@ -1,5 +1,5 @@
 import type { TrainingSession } from "../../types/personalDashboard";
-import type { RotinaResponse } from "../../types/rotina";
+import type { PlanejamentoRotinaResponseDTO, RotinaResponse } from "../../types/rotina";
 import type { TipoMetrica } from "../../types/metric";
 import type { StudentTracking } from "../../types/studentProfile";
 import { localDateKey } from "../personal/dashboardModel";
@@ -102,6 +102,97 @@ export function buildActiveRoutineSessions(
   }
 
   return [...byId.values()];
+}
+
+/**
+ * Sintetiza um objeto StudentTracking escopado ao aluno a partir do planejamento da rotina
+ * e do histórico de sessões do próprio aluno (para rotinas ativas secundárias).
+ */
+export function buildTrackingFromPlanning(
+  studentId: string,
+  routine: RotinaResponse,
+  planning: PlanejamentoRotinaResponseDTO,
+  historySessions: TrainingSession[]
+): StudentTracking {
+  const routineHistory = historySessions.filter(
+    (h) =>
+      h.rotinaTreinoId === routine.id &&
+      (!h.desempenho?.alunoId || h.desempenho.alunoId === studentId)
+  );
+  const plannedSessions = (planning.semanas || []).flatMap((w) => w.sessoes || []);
+  const usedHistoryIds = new Set<string>();
+  const matchedByPlannedId = new Map<string, TrainingSession>();
+
+  // Passada 1: correspondência exata por ID da sessão
+  for (const s of plannedSessions) {
+    const exact = routineHistory.find((h) => h.id === s.id && !usedHistoryIds.has(h.id));
+    if (exact) {
+      usedHistoryIds.add(exact.id);
+      matchedByPlannedId.set(s.id, exact);
+    }
+  }
+
+  // Passada 2: fallback por semana + dataPlanejada sem reutilizar sessões já associadas
+  for (const s of plannedSessions) {
+    if (matchedByPlannedId.has(s.id)) continue;
+    const fallback = routineHistory.find(
+      (h) =>
+        !usedHistoryIds.has(h.id) &&
+        h.semana === s.semana &&
+        h.dataPlanejada === s.dataPlanejada
+    );
+    if (fallback) {
+      usedHistoryIds.add(fallback.id);
+      matchedByPlannedId.set(s.id, fallback);
+    }
+  }
+
+  const personalRequiredMetrics = (routine.metricas || []).filter(
+    (m) =>
+      (m.quemPreenche === "PERSONAL" || m.quemPreenche === "AMBOS") &&
+      m.obrigatoria !== false
+  );
+
+  let quantidadeMetricasPendentes = 0;
+
+  const sessoes: StudentTracking["sessoes"] = plannedSessions
+    .filter((s) => s.status !== "CANCELADA")
+    .map((s) => {
+      const matched = matchedByPlannedId.get(s.id);
+      const isCompleted = Boolean(matched);
+      const desempenho = matched?.desempenho ?? null;
+
+      const pendingPersonalCount = isCompleted
+        ? personalRequiredMetrics.filter((m) => {
+            const val = desempenho?.metricas.find((entry) => entry.metricaId === m.id)?.valor;
+            return !val || !val.trim();
+          }).length
+        : 0;
+
+      quantidadeMetricasPendentes += pendingPersonalCount;
+
+      return {
+        sessaoId: s.id,
+        semana: s.semana,
+        dataPlanejada: s.dataPlanejada,
+        dataReal: matched?.dataReal ?? null,
+        duracao: matched ? matched.duracao : s.duracao ?? null,
+        atividades: s.atividades,
+        status: isCompleted ? "CONCLUIDA" : "PLANEJADA",
+        concluidaAluno: matched?.concluidaAluno ?? isCompleted,
+        validadaPersonal: matched?.validadaPersonal ?? false,
+        temPendenciasPersonal: pendingPersonalCount > 0,
+        quantidadePendenciasPersonal: pendingPersonalCount,
+        desempenho,
+      };
+    });
+
+  return {
+    alunoId: studentId,
+    rotinaAtivaId: routine.id,
+    quantidadeMetricasPendentes,
+    sessoes,
+  };
 }
 
 export function metricNumber(type: string, value: string): number | null {
