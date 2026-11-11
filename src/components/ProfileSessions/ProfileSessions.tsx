@@ -33,6 +33,19 @@ export default function ProfileSessions({
   const [weekFilter, setWeekFilter] = useState<number | "ALL">("ALL");
   const [historyScope, setHistoryScope] = useState<HistoryScopeFilter>("all_routines");
   const [searchQuery, setSearchQuery] = useState("");
+  const [trackedRoutineId, setTrackedRoutineId] = useState<string | undefined>(activeRoutine?.id);
+
+  if (trackedRoutineId !== activeRoutine?.id) {
+    setTrackedRoutineId(activeRoutine?.id);
+    setStatusFilter("all");
+    setWeekFilter("ALL");
+    setPage(1);
+  }
+
+  const activeRoutineCount = useMemo(
+    () => routines.filter((r) => r.ativo !== false).length,
+    [routines]
+  );
 
   const routineTitleById = useMemo(
     () => new Map(routines.map((r) => [r.id, r.titulo])),
@@ -283,66 +296,62 @@ export default function ProfileSessions({
                       setPage(1);
                     }}
                   >
-                    Somente rotina ativa
+                    {activeRoutineCount > 1
+                      ? `Somente: ${activeRoutine.titulo}`
+                      : "Somente rotina ativa"}
                   </button>
                 )}
               </div>
             )}
-
-            {recent && availableWeeks.length > 1 && (
-              <div className="profile-sessions__pills profile-sessions__pills--weeks">
-                <button
-                  type="button"
-                  className={`profile-sessions__pill${weekFilter === "ALL" ? " is-active" : ""}`}
-                  onClick={() => {
-                    setWeekFilter("ALL");
-                    setPage(1);
-                  }}
-                >
-                  Todas as semanas
-                </button>
-                {availableWeeks.map((wk) => (
-                  <button
-                    key={wk}
-                    type="button"
-                    className={`profile-sessions__pill${weekFilter === wk ? " is-active" : ""}`}
-                    onClick={() => {
-                      setWeekFilter(wk);
-                      setPage(1);
-                    }}
-                  >
-                    Semana {wk}
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
 
-          <div className="profile-sessions__search">
-            <Search size={13} className="profile-sessions__search-icon" aria-hidden="true" />
-            <input
-              type="search"
-              placeholder="Buscar sessão ou atividade..."
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setPage(1);
-              }}
-              aria-label="Buscar sessão ou atividade"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                className="profile-sessions__search-clear"
-                onClick={() => {
-                  setSearchQuery("");
+          <div className="profile-sessions__controls">
+            {recent && availableWeeks.length > 1 && (
+              <select
+                className="profile-sessions__week-select"
+                aria-label="Filtrar por semana"
+                value={weekFilter === "ALL" ? "ALL" : String(weekFilter)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setWeekFilter(val === "ALL" ? "ALL" : Number(val));
                   setPage(1);
                 }}
-                aria-label="Limpar busca"
               >
-                <X size={12} aria-hidden="true" />
-              </button>
+                <option value="ALL">Todas as semanas ({availableWeeks.length})</option>
+                {availableWeeks.map((wk) => (
+                  <option key={wk} value={String(wk)}>
+                    Semana {wk}
+                  </option>
+                ))}
+              </select>
             )}
+
+            <div className="profile-sessions__search">
+              <Search size={13} className="profile-sessions__search-icon" aria-hidden="true" />
+              <input
+                type="search"
+                placeholder="Buscar sessão ou atividade..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setPage(1);
+                }}
+                aria-label="Buscar sessão ou atividade"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  className="profile-sessions__search-clear"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setPage(1);
+                  }}
+                  aria-label="Limpar busca"
+                >
+                  <X size={12} aria-hidden="true" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -361,19 +370,24 @@ export default function ProfileSessions({
         </p>
       ) : (
         <>
-          <div className="profile-sessions__scroll">
+          <div
+            className="profile-sessions__scroll"
+            tabIndex={0}
+            role="region"
+            aria-label={recent ? "Sessões da rotina ativa" : "Histórico de sessões"}
+          >
             <table>
               <thead>
                 <tr>
                   <th scope="col">Sessão / Atividades</th>
-                  <th scope="col">Data</th>
-                  <th scope="col">Duração</th>
+                  <th scope="col">{recent ? "Data / Duração" : "Data"}</th>
+                  {!recent && <th scope="col">Duração</th>}
                   {metrics.map((m) => (
                     <th scope="col" key={m.metricaId}>{m.tituloMetrica}</th>
                   ))}
                   <th scope="col">RPE</th>
                   <th scope="col">Status</th>
-                  <th scope="col">Fonte</th>
+                  {!recent && <th scope="col">Fonte</th>}
                 </tr>
               </thead>
               <tbody>
@@ -383,20 +397,30 @@ export default function ProfileSessions({
                     parsed.sessionName ||
                     parsed.activities[0]?.title ||
                     `Sessão da Semana ${s.semana}`;
+                  const usedFirstActivityAsTitle =
+                    !parsed.sessionName && Boolean(parsed.activities[0]?.title);
+                  const previewActivities = usedFirstActivityAsTitle
+                    ? parsed.activities.slice(1)
+                    : parsed.activities;
                   const activitiesPreview =
-                    parsed.activities.length > 0
-                      ? parsed.activities
+                    previewActivities.length > 0
+                      ? previewActivities
                           .slice(0, 2)
-                          .map((a, idx) => `${idx + 1}. ${a.title}`)
+                          .map(
+                            (a, idx) =>
+                              `${usedFirstActivityAsTitle ? idx + 2 : idx + 1}. ${a.title}`
+                          )
                           .join(" · ") +
-                        (parsed.activities.length > 2
-                          ? ` (+${parsed.activities.length - 2})`
+                        (previewActivities.length > 2
+                          ? ` (+${previewActivities.length - 2})`
                           : "")
                       : "";
                   const isCompleted = s.status === "CONCLUIDA" || s.concluidaAluno;
                   const routineName = !recent
                     ? routineTitleById.get(s.rotinaTreinoId)
                     : null;
+                  const durationPrefix =
+                    recent && s.duracao !== null ? `${s.duracao} min · ` : "";
 
                   return (
                     <tr
@@ -427,17 +451,21 @@ export default function ProfileSessions({
                           {s.dataReal ? (
                             <>
                               <strong>{displayDate(s.dataReal)}</strong>
-                              <span>Planejada: {displayDate(s.dataPlanejada)}</span>
+                              <span>
+                                {durationPrefix}Planejada: {displayDate(s.dataPlanejada)}
+                              </span>
                             </>
                           ) : (
                             <>
                               <strong>{displayDate(s.dataPlanejada)}</strong>
-                              <span>Data planejada</span>
+                              <span>{durationPrefix}Data planejada</span>
                             </>
                           )}
                         </div>
                       </td>
-                      <td>{s.duracao === null ? "—" : `${s.duracao} min`}</td>
+                      {!recent && (
+                        <td>{s.duracao === null ? "—" : `${s.duracao} min`}</td>
+                      )}
                       {metrics.map((m) => (
                         <td key={m.metricaId}>
                           {s.desempenho?.metricas.find((v) => v.metricaId === m.metricaId)
@@ -468,17 +496,19 @@ export default function ProfileSessions({
                           )}
                         </div>
                       </td>
-                      <td>
-                        <Badge tone="neutral">
-                          {!isCompleted
-                            ? "Planejamento"
-                            : s.desempenho?.registradoPor === "PERSONAL_TRAINER"
-                            ? "Personal"
-                            : s.desempenho?.registradoPor === "ALUNO"
-                            ? "Aluno"
-                            : "Registrada"}
-                        </Badge>
-                      </td>
+                      {!recent && (
+                        <td>
+                          <Badge tone="neutral">
+                            {!isCompleted
+                              ? "Planejamento"
+                              : s.desempenho?.registradoPor === "PERSONAL_TRAINER"
+                              ? "Personal"
+                              : s.desempenho?.registradoPor === "ALUNO"
+                              ? "Aluno"
+                              : "Registrada"}
+                          </Badge>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}

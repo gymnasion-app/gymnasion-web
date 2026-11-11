@@ -16,8 +16,9 @@ import SessionRegisterDialog from "../../components/SessionRegisterDialog/Sessio
 import ReportDialog from "../../components/ReportDialog/ReportDialog";
 import { usePersonal } from "../../features/personal/PersonalContext";
 import { localDateKey } from "../../features/personal/dashboardModel";
-import { evolutionSeries, formatMetric, ownHistory, buildActiveRoutineSessions } from "../../features/studentProfile/profileModel";
+import { evolutionSeries, formatMetric, ownHistory, buildActiveRoutineSessions, buildTrackingFromPlanning } from "../../features/studentProfile/profileModel";
 import { studentProfileService } from "../../services/studentProfileService";
+import { rotinaService } from "../../services/rotinaService";
 import { relatorioService } from "../../services/relatorioService";
 import { stravaService } from "../../services/stravaService";
 import { authError } from "../../utils/authError";
@@ -38,6 +39,8 @@ function StudentProfileContent({studentId}:{studentId:string}) {
   const [params,setParams]=useSearchParams();
   const tab=["overview","evolution","routines","history"].includes(params.get("aba")||"")?params.get("aba")!:"overview";
   const [tracking,setTracking]=useState<StudentTracking|null>(null);
+  const [extraTrackings,setExtraTrackings]=useState<Record<string,StudentTracking>>({});
+  const [selectedRoutineId,setSelectedRoutineId]=useState("");
   const [routines,setRoutines]=useState<RotinaResponse[]>([]);
   const [sessions,setSessions]=useState<TrainingSession[]>([]);
   const [loading,setLoading]=useState(true);
@@ -57,9 +60,29 @@ function StudentProfileContent({studentId}:{studentId:string}) {
     const result=await Promise.allSettled([studentProfileService.tracking(studentId),studentProfileService.routines(studentId),studentProfileService.history(studentId)]);
     if(request!==version.current)return;
     const [trackingResult,routineResult,historyResult]=result;
-    if(trackingResult.status==="fulfilled")setTracking(trackingResult.value);
-    if(routineResult.status==="fulfilled")setRoutines(routineResult.value);
-    if(historyResult.status==="fulfilled")setSessions(ownHistory(historyResult.value,studentId));
+    const fetchedTracking=trackingResult.status==="fulfilled"?trackingResult.value:null;
+    const fetchedRoutines=routineResult.status==="fulfilled"?routineResult.value:null;
+    const fetchedHistory=historyResult.status==="fulfilled"?ownHistory(historyResult.value,studentId):null;
+    if(fetchedTracking!==null)setTracking(fetchedTracking);
+    if(fetchedRoutines!==null)setRoutines(fetchedRoutines);
+    if(fetchedHistory!==null)setSessions(fetchedHistory);
+    if(fetchedRoutines){
+      const secondaryActive=fetchedRoutines.filter(r=>r.ativo!==false&&r.id!==fetchedTracking?.rotinaAtivaId);
+      if(secondaryActive.length>0){
+        const planResults=await Promise.allSettled(secondaryActive.map(r=>rotinaService.consultarPlanejamento(r.id)));
+        if(request!==version.current)return;
+        const nextExtra:Record<string,StudentTracking>={};
+        secondaryActive.forEach((r,idx)=>{
+          const pr=planResults[idx];
+          if(pr.status==="fulfilled"){
+            nextExtra[r.id]=buildTrackingFromPlanning(studentId,r,pr.value,fetchedHistory||[]);
+          }
+        });
+        setExtraTrackings(nextExtra);
+      }else{
+        setExtraTrackings({});
+      }
+    }
     setErrors({tracking:trackingResult.status==="rejected"?authError(trackingResult.reason,"Não foi possível carregar o planejamento.").message:"",routines:routineResult.status==="rejected"?authError(routineResult.reason,"Não foi possível carregar as rotinas.").message:"",history:historyResult.status==="rejected"?authError(historyResult.reason,"Não foi possível carregar o histórico.").message:""});
     setLoading(false);
   },[studentId,authorized]);
@@ -69,8 +92,10 @@ function StudentProfileContent({studentId}:{studentId:string}) {
   if(students.loading)return <div className="workspace-card" role="status">Carregando perfil...</div>;
   if(students.error)return <div className="workspace-error" role="alert">{students.error}<Button variant="secondary" onClick={()=>void refresh()}>Tentar novamente</Button></div>;
   if(!student)return <div className="workspace-card student-profile__missing"><h2>Aluno não encontrado</h2><p>Este aluno não está disponível na sua lista.</p><Link to="/alunos">Voltar aos alunos</Link></div>;
-  const active=routines.find(r=>r.ativo!==false)||null;
-  const activeTracking=active&&tracking?.rotinaAtivaId===active.id?tracking:null;
+  const activeRoutines=routines.filter(r=>r.ativo!==false);
+  const active=activeRoutines.find(r=>r.id===selectedRoutineId)||activeRoutines.find(r=>r.id===tracking?.rotinaAtivaId)||activeRoutines[0]||null;
+  const resolveRoutineTracking=(r:RotinaResponse|null):StudentTracking|null=>!r||r.ativo===false?null:tracking?.rotinaAtivaId===r.id?tracking:extraTrackings[r.id]||null;
+  const activeTracking=resolveRoutineTracking(active);
   const activeRoutineSessions=buildActiveRoutineSessions(active,activeTracking,sessions,studentId);
   const allMetrics=[...new Map(routines.flatMap(r=>r.metricas).map(m=>[m.id,m])).values()];
   const today=localDateKey(new Date());
@@ -85,9 +110,38 @@ function StudentProfileContent({studentId}:{studentId:string}) {
     <nav className="student-profile__tabs" aria-label="Seções do perfil">{[["overview","Visão geral"],["evolution","Evolução"],["routines","Rotinas"],["history","Histórico"]].map(([key,label])=><button key={key} aria-current={tab===key?"page":undefined} onClick={()=>changeTab(key)}>{label}{key==="routines"&&!loading&&!errors.routines&&<span>{routines.length}</span>}{key==="history"&&!loading&&!errors.history&&<span>{sessions.length}</span>}</button>)}</nav>
     {Object.values(errors).some(Boolean)&&<div className="workspace-error" role="alert">Alguns dados do perfil não puderam ser atualizados. <Button variant="secondary" onClick={()=>void load()}>Tentar novamente</Button></div>}
     {loading?<div className="workspace-card" role="status">Carregando rotinas e sessões...</div>:tab==="overview"?<div className="student-profile__overview"><div className="student-profile__main">
+      {!errors.routines&&!errors.tracking&&activeRoutines.length>1&&(
+        <div className="student-profile__routine-switcher" role="tablist" aria-label="Selecionar rotina ativa">
+          <span className="student-profile__routine-switcher-label">Rotinas ativas ({activeRoutines.length}):</span>
+          {activeRoutines.map((r,idx)=>(
+            <button
+              key={r.id}
+              type="button"
+              role="tab"
+              aria-selected={active?.id===r.id}
+              tabIndex={active?.id===r.id?0:-1}
+              className="student-profile__routine-tab"
+              onClick={()=>setSelectedRoutineId(r.id)}
+              onKeyDown={(e)=>{
+                if(e.key==="ArrowRight"||e.key==="ArrowLeft"){
+                  e.preventDefault();
+                  const nextIdx=e.key==="ArrowRight"?(idx+1)%activeRoutines.length:(idx-1+activeRoutines.length)%activeRoutines.length;
+                  const nextRoutine=activeRoutines[nextIdx];
+                  setSelectedRoutineId(nextRoutine.id);
+                  const buttons=e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]');
+                  buttons?.[nextIdx]?.focus();
+                }
+              }}
+            >
+              <span>{r.titulo}</span>
+              <small>{r.frequenciaSemanal}x/sem</small>
+            </button>
+          ))}
+        </div>
+      )}
       {errors.routines||errors.tracking?<div className="workspace-card workspace-error">{errors.routines||errors.tracking}</div>:active?<ProfileRoutineCard routine={active} tracking={activeTracking} studentId={studentId} onUnlink={()=>setUnlinkRoutine(active)}/>:<div className="workspace-card student-profile__missing"><h2>Aluno sem rotina ativa</h2><p>Vincule uma rotina para acompanhar as sessões e os resultados.</p>{student.status==="ATIVO"&&<Button onClick={()=>setAssign(true)}>Vincular rotina</Button>}</div>}
       {errors.history&&errors.tracking?<div className="workspace-error">{errors.history||errors.tracking}</div>:<ProfileSessions sessions={activeRoutineSessions} recent studentId={studentId} activeRoutine={active} routines={routines} onHistory={()=>changeTab("history")}/>}
-    </div><aside className="student-profile__stats"><div className="workspace-card student-profile__stat"><span><img src="/student-profile/imgIconActivity2.svg" alt=""/></span><div><strong>{errors.history?"—":month.length}</strong><p>Sessões no mês</p></div></div><div className="workspace-card student-profile__stat student-profile__stat--effort"><span><img src="/student-profile/imgIconFlame.svg" alt=""/></span><div><strong>{!errors.history&&efforts.length?formatMetric(efforts.reduce((a,b)=>a+b,0)/efforts.length,"RPE"):"—"}</strong><p>RPE médio no mês (Borg)</p></div></div><div className="workspace-card student-profile__stat student-profile__stat--best"><span><img src="/student-profile/imgIconTrend.svg" alt=""/></span><div><strong>{!errors.history&&best!==null&&primarySeries.type==="TEMPO"?formatMetric(best,"TEMPO"):"—"}</strong><p>{primarySeries.type==="TEMPO"?"Menor tempo · "+primarySeries.title:"Melhor tempo ainda sem registros"}</p></div></div>{!errors.history&&<EvolutionCard series={{...primarySeries,points:primarySeries.points.slice(-8)}} compact/>}</aside></div>:tab==="evolution"?errors.history?<p className="workspace-error">{errors.history}</p>:<StudentEvolution sessions={sessions} metrics={allMetrics}/>:tab==="history"?errors.history?<p className="workspace-error">{errors.history}</p>:<ProfileSessions sessions={sessions} studentId={studentId} activeRoutine={active} routines={routines}/>:<div className="student-profile__routines">{errors.routines?<p className="workspace-error">{errors.routines}</p>:routines.length?routines.map(r=><ProfileRoutineCard key={r.id} routine={r} tracking={r.ativo!==false&&tracking?.rotinaAtivaId===r.id?tracking:null} studentId={studentId} showWeek={r.ativo!==false} onUnlink={()=>setUnlinkRoutine(r)}/>):<p className="workspace-card">Nenhuma rotina vinculada.</p>}{!active&&!errors.routines&&student.status==="ATIVO"&&<Button onClick={()=>setAssign(true)}>Vincular rotina</Button>}</div>}
+    </div><aside className="student-profile__stats"><div className="workspace-card student-profile__stat"><span><img src="/student-profile/imgIconActivity2.svg" alt=""/></span><div><strong>{errors.history?"—":month.length}</strong><p>Sessões no mês</p></div></div><div className="workspace-card student-profile__stat student-profile__stat--effort"><span><img src="/student-profile/imgIconFlame.svg" alt=""/></span><div><strong>{!errors.history&&efforts.length?formatMetric(efforts.reduce((a,b)=>a+b,0)/efforts.length,"RPE"):"—"}</strong><p>RPE médio no mês (Borg)</p></div></div><div className="workspace-card student-profile__stat student-profile__stat--best"><span><img src="/student-profile/imgIconTrend.svg" alt=""/></span><div><strong>{!errors.history&&best!==null&&primarySeries.type==="TEMPO"?formatMetric(best,"TEMPO"):"—"}</strong><p>{primarySeries.type==="TEMPO"?"Menor tempo · "+primarySeries.title:"Melhor tempo ainda sem registros"}</p></div></div>{!errors.history&&<EvolutionCard series={{...primarySeries,points:primarySeries.points.slice(-8)}} compact/>}</aside></div>:tab==="evolution"?errors.history?<p className="workspace-error">{errors.history}</p>:<StudentEvolution sessions={sessions} metrics={allMetrics}/>:tab==="history"?errors.history?<p className="workspace-error">{errors.history}</p>:<ProfileSessions sessions={sessions} studentId={studentId} activeRoutine={active} routines={routines}/>:<div className="student-profile__routines">{errors.routines?<p className="workspace-error">{errors.routines}</p>:routines.length?routines.map(r=><ProfileRoutineCard key={r.id} routine={r} tracking={r.ativo!==false?resolveRoutineTracking(r):null} studentId={studentId} showWeek={r.ativo!==false} onUnlink={()=>setUnlinkRoutine(r)}/>):<p className="workspace-card">Nenhuma rotina vinculada.</p>}{!active&&!errors.routines&&student.status==="ATIVO"&&<Button onClick={()=>setAssign(true)}>Vincular rotina</Button>}</div>}
     <Link className="workspace-link" to="/alunos">← Voltar aos alunos</Link>
     {register&&active&&<SessionRegisterDialog student={student} routine={active} tracking={activeTracking} onClose={()=>setRegister(false)} onSaved={()=>{setRegister(false);toast.success("Sessão registrada com sucesso!");void load();void refresh();}}/>}
     {report&&<ReportDialog studentName={student.usuario.nome} modalidades={student.modalidades} onClose={()=>setReport(false)} generate={(filter,signal)=>relatorioService.gerarPeloPersonal(student.id,filter,signal)} loadAvailability={signal=>relatorioService.disponibilidadePeloPersonal(student.id,signal)}/>}
