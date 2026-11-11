@@ -2,8 +2,9 @@
 .profile-routine header p { margin-top: 2px; font-size: 13px; color: var(--color-ink-500); }
 .profile-routine__actions { display: flex; align-items: center; gap: 8px; flex: none; }
 .profile-routine__edit { padding: 8px; }
-.profile-routine__metrics { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
-.profile-routine__metrics > span { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 6px 10px; background: var(--color-background); border-radius: 8px; font-size: 12px; }
+.profile-routine__metrics { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+.profile-routine__metrics > span { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; background: var(--color-background); border: 1px solid var(--color-border, #e2e8f0); border-radius: 999px; font-size: 12px; white-space: nowrap; transition: border-color 0.15s ease; }
+.profile-routine__metrics > span:hover { border-color: var(--color-primary-300, #fdba74); }
 .profile-routine__metrics small { font-size: inherit; color: var(--color-ink-500); }
 .profile-routine__week-label { color: var(--color-ink-500); font-size: 12px; font-weight: 600; }
 .profile-routine__week { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: 8px; margin-top: 16px; }

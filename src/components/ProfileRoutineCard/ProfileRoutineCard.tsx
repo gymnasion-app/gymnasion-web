@@ -73,16 +73,17 @@ export default function ProfileRoutineCard({
         {routine.metricas.map((metric) => {
           const filler = metric.quemPreenche ? fillerLabel[metric.quemPreenche] || metric.quemPreenche : "";
           const obrigLabel = metric.obrigatoria !== false ? "Obrigatória" : "Opcional";
+          const tooltip = `${metric.titulo} (${metricLabels[metric.tipo]}) — ${obrigLabel}${filler ? ` · Preenchido por: ${filler}` : ""}`;
           return (
-            <span key={metric.id} title={filler ? `Preenchido por: ${filler} (${obrigLabel.toLowerCase()})` : undefined}>
+            <span key={metric.id} title={tooltip}>
               <img src={"/student-profile/" + metricIcons[metric.tipo] + ".svg"} alt="" />
-              <strong>{metric.titulo}{metric.obrigatoria !== false ? " *" : ""}</strong>
-              <small>· {metricLabels[metric.tipo]} · {obrigLabel}{filler ? ` · ${filler}` : ""}</small>
+              <strong>{metric.titulo}</strong>
+              <small>· {metricLabels[metric.tipo]}</small>
             </span>
           );
         })}
       </div>
-      {showWeek && (
+      {showWeek && Boolean(tracking && tracking.rotinaAtivaId === routine.id && tracking.sessoes.length > 0) && (
         <>
           <p className="profile-routine__week-label">
             Semana de referência · {days.reduce((sum, day) => sum + day.completed, 0)} de{" "}
