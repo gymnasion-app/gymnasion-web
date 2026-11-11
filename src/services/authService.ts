@@ -6,7 +6,7 @@ export const authService = {
   async login(payload: LoginPayload, remember = false): Promise<LoginResponse> {
     const { data } = await api.post<LoginResponse>("/api/auth/login", payload);
 
-    session.save(data, remember);
+    session.save(data, remember, payload.email);
 
     return data;
   },

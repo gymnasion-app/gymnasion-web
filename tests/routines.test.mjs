@@ -549,6 +549,31 @@ test("filterAndSortRoutineMetrics, classifyStudentsForRoutine and multiple turma
   assert.equal(JSON.stringify(step3.nextStudentIds), JSON.stringify(["s2", "s3"]));
 });
 
+test("eligibleStudentsForRoutine enforces 1 active routine per linked sport for hybrid athletes", () => {
+  const hybrid = {
+    id: "h1",
+    usuario: { nome: "Híbrido", email: "h@gymnasion.test" },
+    status: "ATIVO",
+    modalidades: [
+      { id: 1, nome: "Natação" },
+      { id: 2, nome: "Musculação" },
+    ],
+  };
+  const routines = [
+    makeRoutine("r-swim", "Natação Base", 1, 3, true, "ATIVA", [{ id: "h1", nome: "Híbrido" }]),
+  ];
+
+  // Bloqueado na mesma modalidade (1 = Natação)
+  assert.deepEqual(model.eligibleStudentsForRoutine([hybrid], routines, undefined, 1), []);
+  // Elegível em outra modalidade vinculada (2 = Musculação)
+  assert.deepEqual(
+    model.eligibleStudentsForRoutine([hybrid], routines, undefined, 2).map((s) => s.id),
+    ["h1"]
+  );
+  // Inelegível em modalidade não vinculada ao perfil (3 = Corrida)
+  assert.deepEqual(model.eligibleStudentsForRoutine([hybrid], routines, undefined, 3), []);
+});
+
 
 
 

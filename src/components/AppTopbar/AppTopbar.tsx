@@ -52,8 +52,17 @@ export default function AppTopbar({
 }: Props) {
   const { settings } = useAccountSettings();
   const searchRef = useRef<HTMLInputElement>(null);
+  const notificationBtnRef = useRef<HTMLButtonElement>(null);
   const [query, setQuery] = useState("");
   const [popoverOpen, setPopoverOpen] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+  const closeTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     const focusSearch = (event: KeyboardEvent) => {
@@ -66,12 +75,27 @@ export default function AppTopbar({
     return () => window.removeEventListener("keydown", focusSearch);
   }, []);
 
+  const closePopover = () => {
+    if (isClosing || !popoverOpen) return;
+    setIsClosing(true);
+    closeTimeoutRef.current = window.setTimeout(() => {
+      setPopoverOpen(false);
+      setIsClosing(false);
+    }, 150);
+  };
+
   const handleNotificationsClick = () => {
     if (onNotifications && !notifications) {
       onNotifications();
       return;
     }
-    setPopoverOpen((prev) => !prev);
+    if (popoverOpen) {
+      closePopover();
+    } else {
+      if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
+      setIsClosing(false);
+      setPopoverOpen(true);
+    }
   };
 
   return (
@@ -154,6 +178,7 @@ export default function AppTopbar({
         <div className="ds-topbar__user-controls">
           <div className="ds-topbar__notification-wrapper">
             <button
+              ref={notificationBtnRef}
               type="button"
               className="ds-topbar__notifications"
               aria-label={
@@ -161,7 +186,7 @@ export default function AppTopbar({
                   ? `Abrir notificações: ${notificationCount} não lidas`
                   : "Abrir notificações"
               }
-              aria-expanded={popoverOpen}
+              aria-expanded={popoverOpen && !isClosing}
               aria-haspopup="dialog"
               onClick={handleNotificationsClick}
             >
@@ -180,11 +205,13 @@ export default function AppTopbar({
 
             {popoverOpen && (
               <NotificationPopover
+                triggerRef={notificationBtnRef}
+                isClosing={isClosing}
                 notifications={notifications?.data || []}
                 loading={notifications?.loading}
                 error={notifications?.error}
                 busy={notificationBusy}
-                onClose={() => setPopoverOpen(false)}
+                onClose={closePopover}
                 onRead={onReadNotification || (() => {})}
                 onRetry={onRefreshNotifications}
               />

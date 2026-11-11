@@ -159,7 +159,15 @@ export default function PersonalProvider({ children }: { children: ReactNode }) 
         : [updated, ...previous.data],
     }));
   }, []);
-  return <PersonalContext.Provider value={{students,routines,groups,activities,busyId,refresh,mutate,notifications,histories,notificationBusy,readNotification,linkRoutine,syncRoutine,actionError}}>
+  const syncStudent = useCallback((updated: AlunoResponse) => {
+    setStudents(previous => ({
+      ...previous,
+      data: previous.data.some(item => item.id === updated.id)
+        ? previous.data.map(item => item.id === updated.id ? updated : item)
+        : [updated, ...previous.data],
+    }));
+  }, []);
+  return <PersonalContext.Provider value={{students,routines,groups,activities,busyId,refresh,mutate,notifications,histories,notificationBusy,readNotification,linkRoutine,syncRoutine,syncStudent,actionError}}>
     {children}
     {notice && <div className="personal-notice"><Toast {...notice} onClose={()=>setNotice(null)}/></div>}
   </PersonalContext.Provider>;

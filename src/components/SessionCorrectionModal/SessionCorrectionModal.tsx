@@ -72,7 +72,7 @@ export default function SessionCorrectionModal({
           <div className="correction-modal__title-group">
             <h2>Corrigir registro de desempenho</h2>
             <p>
-              {studentName} · Sessão {session.semana} · Auditoria de alterações (US-23)
+              {studentName} · Sessão {session.semana} · Auditoria de alterações
             </p>
           </div>
           <button className="correction-modal__close" onClick={onClose} aria-label="Fechar modal">

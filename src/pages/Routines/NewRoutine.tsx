@@ -216,7 +216,7 @@ export default function NewRoutine() {
     };
   }, [routineId, navigate]);
 
-  // Pré-seleciona aluno vindo por query param (?aluno=...)
+  // Pré-seleciona aluno vindo por query param (?aluno=...) e primeira modalidade livre
   useEffect(() => {
     if (initialStudentId && !routineId) {
       const student = students.data.find(
@@ -226,12 +226,26 @@ export default function NewRoutine() {
         setSelectedStudentIds((prev) =>
           prev.includes(initialStudentId) ? prev : [...prev, student.id]
         );
-        if (student.modalidades?.[0]?.id) {
-          setModalidadeId((prev) => prev ?? student.modalidades[0].id);
+        const activeModIds = new Set(
+          routines.data
+            .filter(
+              (r) =>
+                r.ativo !== false &&
+                r.status !== "ENCERRADA" &&
+                r.alunos.some((a) => a.id === student.id)
+            )
+            .map((r) => r.modalidadeId ?? r.modalidade?.id)
+            .filter((id): id is number => id != null)
+        );
+        const firstFree =
+          student.modalidades?.find((m) => !activeModIds.has(m.id)) ??
+          student.modalidades?.[0];
+        if (firstFree?.id) {
+          setModalidadeId((prev) => prev ?? firstFree.id);
         }
       }
     }
-  }, [initialStudentId, students.data, routineId]);
+  }, [initialStudentId, students.data, routines.data, routineId]);
 
   // Pré-preenche a partir de uma rotina modelo (?modelo=...)
   useEffect(() => {
@@ -986,7 +1000,7 @@ export default function NewRoutine() {
                         {filteredBusyStudents.length > 0 && (
                           <div className="new-routine-dropdown__busy-section">
                             <div className="new-routine-dropdown__section-label">
-                              Já possuem rotina ativa em {selectedModalidadeNome} (RN-012)
+                              Já possuem rotina ativa em {selectedModalidadeNome}
                             </div>
                             {filteredBusyStudents.map((busyItem, idx) => {
                               const color = getAvatarColor(idx + 2);

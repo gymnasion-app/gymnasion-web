@@ -249,11 +249,22 @@ export default function StudentRpeModal({
     return null;
   }, [resolvedSessionId, studentCtx?.weeks]);
 
+  const targetRoutine = useMemo(() => {
+    if (!targetSession || !studentCtx?.activeRoutines?.length) {
+      return studentCtx?.activeRoutine || null;
+    }
+    return (
+      studentCtx.activeRoutines.find((r) => r.id === targetSession.rotinaTreinoId) ||
+      studentCtx.activeRoutine ||
+      null
+    );
+  }, [targetSession, studentCtx?.activeRoutines, studentCtx?.activeRoutine]);
+
   const [step, setStep] = useState<"metrics" | "rpe">("metrics");
   const [loadingForm, setLoadingForm] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [metrics, setMetrics] = useState<StudentExecutionMetricDTO[]>(
-    () => studentCtx?.activeRoutine?.metricas || []
+    () => targetRoutine?.metricas || []
   );
 
   const todayIso = useMemo(() => localDateKey(new Date()), []);

@@ -25,6 +25,7 @@ export default function StudentLayout() {
   const {
     student,
     activeRoutine,
+    activeRoutines,
     unreadNotifications,
     setSearchQuery,
     rpeModalSessionId,
@@ -205,6 +206,9 @@ export default function StudentLayout() {
       {reportOpen && (
         <ReportDialog
           studentName={student.name}
+          modalidades={activeRoutines
+            .filter((r) => r.modalidadeId != null)
+            .map((r) => ({ id: r.modalidadeId!, nome: r.modalidade }))}
           onClose={() => setReportOpen(false)}
           generate={(filter, signal) => relatorioService.gerarPeloAluno(filter, signal)}
           loadAvailability={signal => relatorioService.disponibilidadePeloAluno(signal)}
@@ -227,7 +231,11 @@ export default function StudentLayout() {
           <WorkspaceDialog
             title={inspectedSession.titulo}
             description={`Semana ${inspectedSession.semana} · ${inspectedSession.diaSemana}, ${inspectedSession.dataPlanejada}${
-              activeRoutine ? ` · ${activeRoutine.modalidade}` : ""
+              inspectedSession.modalidadeNome
+                ? ` · ${inspectedSession.modalidadeNome}`
+                : activeRoutine
+                ? ` · ${activeRoutine.modalidade}`
+                : ""
             }`}
             icon="/student-profile/imgIconActivity2.svg"
             onClose={() => setInspectedSession(null)}
@@ -362,7 +370,7 @@ export default function StudentLayout() {
       {messageModalOpen && (
         <WorkspaceDialog
           title={`Enviar mensagem para ${student.personal.name}`}
-          description="Registre uma observação ou dúvida sobre sua rotina de treinos (US-26)."
+          description="Registre uma observação ou dúvida sobre sua rotina de treinos."
           icon="/design-system/imgIconMsg.svg"
           busy={sendingMessage}
           onClose={() => setMessageModalOpen(false)}

@@ -93,8 +93,27 @@ test("failed login does not create a session; successful login honors persistenc
   fail = false;
   await authService.login({ email: "test@example.invalid", password: "test" }, true);
   assert.equal(fixture.localStorage.getItem("@Gymnasion:token"), response.token);
+  assert.equal(fixture.session.getRememberedEmail(), "test@example.invalid");
   authService.logout();
   assert.equal(fixture.session.getUser(), null);
+  assert.equal(fixture.session.getRememberedEmail(), "test@example.invalid");
+  fixture.session.clearRememberedEmail();
+  assert.equal(fixture.session.getRememberedEmail(), null);
+});
+
+test("remember me stores email and unchecking remember clears it on login", async () => {
+  const fixture = sessionFixture();
+  const response = loginResponse();
+  const { authService } = loadModule("services/authService.ts", {}, {
+    "./session": fixture,
+    "./api": { api: { post: async () => ({ data: response }) } },
+  });
+
+  await authService.login({ email: "user@example.com", password: "secret" }, true);
+  assert.equal(fixture.session.getRememberedEmail(), "user@example.com");
+
+  await authService.login({ email: "user@example.com", password: "secret" }, false);
+  assert.equal(fixture.session.getRememberedEmail(), null);
 });
 
 const { validateSignUp, formatPhone } = loadModule("pages/SignUp/validation.ts");

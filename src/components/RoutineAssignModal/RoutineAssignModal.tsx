@@ -318,7 +318,7 @@ export default function RoutineAssignModal({
                       loading={unlinkingStudentId === aluno.id}
                       title={
                         isOnly
-                          ? "Mínimo de 1 aluno vinculado por rotina (RN-012)"
+                          ? "Mínimo de 1 aluno vinculado por rotina"
                           : "Desvincular aluno"
                       }
                       onClick={() => handleUnlinkStudent(aluno.id)}

@@ -17,6 +17,7 @@ export type PersonalState = {
   readNotification: (id?: string) => Promise<boolean>;
   linkRoutine: (student: AlunoResponse, routineId: string) => Promise<boolean>;
   syncRoutine: (routine: RotinaResponse) => void;
+  syncStudent: (student: AlunoResponse) => void;
   refresh: () => Promise<void>;
   mutate: (student: AlunoResponse, action: StudentMutation) => Promise<boolean>;
 };

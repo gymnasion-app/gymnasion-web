@@ -1,8 +1,76 @@
-.invite-v2{display:grid;gap:10px;font-size:13px;color:var(--color-text-secondary)}
-.invite-v2 label{font-weight:600}
-.invite-v2 select,.invite-v2 input{font:inherit;background:var(--color-surface);color:var(--color-text-secondary);border:1px solid var(--color-border);border-radius:8px;padding:12px;width:100%;min-width:0}
-.invite-v2__note{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--color-text-muted);margin:8px 0}
-.invite-v2__link{display:flex;gap:8px}
-.invite-v2__email{border-top:1px solid var(--color-border);padding-top:20px;margin-top:12px}
-.invite-v2__email p{font-size:12px;line-height:1.7;color:var(--color-text-muted)}
-.invite-v2 button:not(.button){background:none;border:0;color:var(--color-primary-600);cursor:pointer}
+.invite-v2__dialog.workspace-dialog--wide {
+  width: min(560px, calc(100vw - 32px));
+}
+
+.invite-v2 {
+  display: grid;
+  gap: 14px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.invite-v2__email-field {
+  display: grid;
+  gap: 6px;
+}
+
+.invite-v2__email-field label {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.invite-v2 select,
+.invite-v2 input:not([type="checkbox"]):not([type="search"]) {
+  font: inherit;
+  font-size: max(1rem, 1em);
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  min-block-size: 44px;
+  width: 100%;
+  min-width: 0;
+}
+
+.invite-v2 input:not([type="checkbox"]):not([type="search"]):focus-visible {
+  outline: 2px solid var(--color-primary-600);
+  outline-offset: 2px;
+}
+
+.invite-v2__info {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--color-background, #f8fafc);
+  border: 1px solid var(--color-border);
+  color: var(--color-ink-600, #475569);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.invite-v2__note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.invite-v2__link {
+  display: flex;
+  gap: 8px;
+}
+
+.invite-v2__email {
+  border-top: 1px solid var(--color-border);
+  padding-top: 16px;
+  margin-top: 4px;
+}
+
+.invite-v2__email p {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-text-muted);
+}

@@ -399,7 +399,7 @@ export default function RoutineSessionPlanner() {
 
     // Se o personal preencheu um novo bloco mas esqueceu de clicar em "Confirmar bloco",
     // incluímos automaticamente para não perder o que ele digitou
-    let finalActivities = [...activities];
+    const finalActivities = [...activities];
     if (addingNewActivity && (newActTitle.trim() || newActDesc.trim())) {
       finalActivities.push({
         id: `act-${Date.now()}`,
@@ -1293,11 +1293,11 @@ export default function RoutineSessionPlanner() {
           <div className="session-planner__info-box" role="status">
             <Info size={20} className="info-icon" />
             <div>
-              <strong>Planejamento semanal flexível (US-09 / US-10)</strong>
+              <strong>Planejamento semanal flexível</strong>
               <p>
                 A frequência de {targetFreq}× por semana serve como guia visual de planejamento,
                 mas você pode adicionar sessões extras se desejar. Para alunos em rotina ativa,
-                apenas a semana atual e a anterior ficam visíveis no aplicativo (US-21 C2).
+                apenas a semana atual e a anterior ficam visíveis no aplicativo.
               </p>
             </div>
           </div>

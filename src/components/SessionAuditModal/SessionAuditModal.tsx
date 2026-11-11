@@ -59,7 +59,7 @@ export default function SessionAuditModal({ sessionId, onClose }: SessionAuditMo
           </div>
           <div className="audit-modal__title-group">
             <h2>Histórico de alterações</h2>
-            <p>Registro de auditoria e correções de desempenho (US-23 C5)</p>
+            <p>Registro de auditoria e correções de desempenho</p>
           </div>
           <button className="audit-modal__close" onClick={onClose} aria-label="Fechar modal">
             <X size={20} />

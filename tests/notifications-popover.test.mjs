@@ -130,3 +130,40 @@ test("bell click in topbar opens popover locally instead of redirecting to main 
   assert.equal(popoverOpen, false);
   assert.equal(redirectedTo, "");
 });
+
+test("outside click logic ignores trigger button to avoid closing on mousedown and reopening on click", () => {
+  const triggerElement = { id: "trigger-btn" };
+  const popoverElement = { id: "popover-content" };
+
+  const triggerRef = { current: triggerElement };
+  const popoverRef = { current: popoverElement };
+
+  let closed = false;
+  const onClose = () => {
+    closed = true;
+  };
+
+  const simulateClickOutside = (target) => {
+    closed = false;
+    if (triggerRef.current && (triggerRef.current === target || triggerRef.current.contains?.(target))) {
+      return;
+    }
+    if (popoverRef.current && (popoverRef.current === target || popoverRef.current.contains?.(target))) {
+      return;
+    }
+    onClose();
+  };
+
+  // Clicking trigger should NOT trigger outside-close
+  simulateClickOutside(triggerElement);
+  assert.equal(closed, false, "Clicking trigger element must not be treated as outside click");
+
+  // Clicking inside popover should NOT trigger outside-close
+  simulateClickOutside(popoverElement);
+  assert.equal(closed, false, "Clicking inside popover must not trigger outside click");
+
+  // Clicking outside both should trigger outside-close
+  const outsideElement = { id: "outside" };
+  simulateClickOutside(outsideElement);
+  assert.equal(closed, true, "Clicking outside both trigger and popover must call onClose");
+});

@@ -1,4 +1,5 @@
 import type { AlunoResponse } from "../../types/student";
+import type { Modalidade } from "../../types/modalidade";
 import type { RotinaResponse } from "../../types/rotina";
 
 export type StudentFilter = "all" | "active" | "inactive" | "pending";
@@ -36,4 +37,11 @@ export function studentRoutines(routines: RotinaResponse[], id: string, modality
 
 export function studentsWithoutRoutine(students: AlunoResponse[], routines: RotinaResponse[]) {
   return students.filter(student => student.status === "ATIVO" && studentRoutines(routines, student.id).length === 0);
+}
+
+export function filterModalities<T extends Pick<Modalidade, "id" | "nome">>(items: T[], query: string): T[] {
+  const term = normalizeSearch(query.trim());
+  const sorted = [...items].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+  if (!term) return sorted;
+  return sorted.filter(item => normalizeSearch(item.nome).includes(term));
 }

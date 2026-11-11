@@ -42,7 +42,7 @@ export default function RoutineStatusDialog({
   const description = isEnd
     ? "Ao encerrar, sessões futuras não executadas serão removidas e os alunos ficarão liberados para iniciar uma nova rotina. O histórico de sessões executadas será integralmente preservado."
     : isDelete
-    ? "A rotina será apagada permanentemente do sistema. Rotinas com sessões já realizadas não podem ser excluídas fisicamente (RN-012)."
+    ? "A rotina será apagada permanentemente do sistema. Rotinas com sessões já realizadas não podem ser excluídas fisicamente."
     : isOnlyStudent
     ? `O aluno ${studentToUnlink?.nome || ""} será desvinculado desta rotina. Como é o único aluno vinculado, a rotina será finalizada liberando o aluno para um novo treino.`
     : `O aluno ${studentToUnlink?.nome || ""} será desvinculado desta rotina. Os demais alunos vinculados continuarão com o treino normalmente.`;

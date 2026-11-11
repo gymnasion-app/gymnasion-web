@@ -13,8 +13,12 @@ import {
 import Badge from "../../components/Badge/Badge";
 import Button from "../../components/Button/Button";
 import SportTag from "../../components/SportTag/SportTag";
+import StudentModalityTabs from "../../components/StudentModalityTabs/StudentModalityTabs";
 import { useStudentArea } from "../../features/studentArea/StudentContext";
-import { filterStudentSessions } from "../../features/studentArea/studentAreaModel";
+import {
+  filterStudentSessions,
+  sportKeyFromName,
+} from "../../features/studentArea/studentAreaModel";
 import { parseAtividades } from "../../utils/activityParser";
 import "./StudentWorkouts.css";
 
@@ -24,6 +28,9 @@ export default function StudentWorkouts() {
   const [searchParams, setSearchParams] = useSearchParams();
   const {
     activeRoutine,
+    activeRoutines,
+    selectedModalityFilter,
+    setSelectedModalityFilter,
     loading,
     selectedWeekNum,
     setSelectedWeekNum,
@@ -32,6 +39,9 @@ export default function StudentWorkouts() {
     setSearchQuery,
     openRpeModal,
   } = useStudentArea();
+
+  const isHybrid = activeRoutines.length > 1;
+  const isUnifiedCalendar = isHybrid && selectedModalityFilter === "ALL";
 
   const [statusFilter, setStatusFilter] = useState<SessionStatusFilter>("todas");
   const [dayFilter, setDayFilter] = useState<string>("TODOS");
@@ -83,7 +93,7 @@ export default function StudentWorkouts() {
   }, [highlightedSessionId, selectedWeekNum, loading]);
 
   const activeWeek = weeks.find((w) => w.numero === selectedWeekNum) || weeks[0];
-  const weekSessions = activeWeek?.sessoes || [];
+  const weekSessions = useMemo(() => activeWeek?.sessoes || [], [activeWeek]);
 
   const pendingInWeekCount = useMemo(
     () => weekSessions.filter((s) => s.status === "PLANEJADA").length,
@@ -134,9 +144,28 @@ export default function StudentWorkouts() {
       if (aPending !== bPending) {
         return aPending - bPending;
       }
+      const dateDiff = (a.dataPlanejadaIso || "").localeCompare(b.dataPlanejadaIso || "");
+      if (dateDiff !== 0) {
+        return dateDiff;
+      }
       return (a.numero || 0) - (b.numero || 0);
     });
   }, [weekSessions, searchQuery, statusFilter, dayFilter]);
+
+  const dateCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const s of weekSessions) {
+      const key = s.dataPlanejadaIso || s.dataPlanejada;
+      if (!key) continue;
+      map.set(key, (map.get(key) || 0) + 1);
+    }
+    return map;
+  }, [weekSessions]);
+
+  const totalWeeklyFrequency = useMemo(
+    () => activeRoutines.reduce((sum, r) => sum + (r.frequenciaSemanal || 0), 0),
+    [activeRoutines]
+  );
 
   // Identifica o ID do primeiro treino pendente da semana para destacá-lo como próximo treino
   const firstPendingSessionId = useMemo(
@@ -158,41 +187,59 @@ export default function StudentWorkouts() {
     }
   };
 
-  const sportKey: "natacao" | "tenis" | "academia" | "corrida" | "ciclismo" | "funcional" =
-    activeRoutine?.modalidade?.toLowerCase().includes("tenis")
-      ? "tenis"
-      : activeRoutine?.modalidade?.toLowerCase().includes("corr")
-      ? "corrida"
-      : activeRoutine?.modalidade?.toLowerCase().includes("acad") ||
-        activeRoutine?.modalidade?.toLowerCase().includes("musc")
-      ? "academia"
-      : activeRoutine?.modalidade?.toLowerCase().includes("cicl")
-      ? "ciclismo"
-      : activeRoutine?.modalidade?.toLowerCase().includes("func")
-      ? "funcional"
-      : "natacao";
+  const sportKey = sportKeyFromName(activeRoutine?.modalidade);
 
   return (
     <div className="student-workouts">
+      <StudentModalityTabs
+        activeRoutines={activeRoutines}
+        selectedFilter={selectedModalityFilter}
+        onSelect={(filter) => {
+          setSelectedModalityFilter(filter);
+          setHighlightedSessionId(null);
+        }}
+      />
+
       {/* Top Active Routine Banner */}
       <section className="student-workouts__banner" aria-label="Rotina ativa">
         <div className="student-workouts__banner-main">
-          <div className="student-workouts__banner-badges">
-            <Badge tone="success">{activeRoutine ? "Rotina ativa" : "Nenhuma rotina ativa"}</Badge>
-            {activeRoutine && <SportTag sport={sportKey} />}
-            {activeRoutine && (
-              <Badge tone="primary">{activeRoutine.frequenciaSemanal}x por semana</Badge>
-            )}
-          </div>
-          <h2>{activeRoutine ? activeRoutine.titulo : "Aguardando novo treino do seu personal"}</h2>
-          <p>
-            {activeRoutine
-              ? `Objetivo: ${activeRoutine.objetivos}`
-              : "Seu personal trainer ainda não vinculou uma rotina ativa à sua conta."}
-          </p>
+          {isUnifiedCalendar ? (
+            <>
+              <div className="student-workouts__banner-badges">
+                <Badge tone="success">{activeRoutines.length} rotinas ativas</Badge>
+                {activeRoutines.map((r) => (
+                  <SportTag key={r.id} sport={sportKeyFromName(r.modalidade)} />
+                ))}
+                <Badge tone="primary">{totalWeeklyFrequency}x por semana no total</Badge>
+              </div>
+              <h2>Calendário completo de treinos</h2>
+              <p>
+                Rotinas ativas:{" "}
+                {activeRoutines.map((r) => `${r.modalidade} (${r.titulo})`).join(" · ")}
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="student-workouts__banner-badges">
+                <Badge tone="success">
+                  {activeRoutine ? "Rotina ativa" : "Nenhuma rotina ativa"}
+                </Badge>
+                {activeRoutine && <SportTag sport={sportKey} />}
+                {activeRoutine && (
+                  <Badge tone="primary">{activeRoutine.frequenciaSemanal}x por semana</Badge>
+                )}
+              </div>
+              <h2>{activeRoutine ? activeRoutine.titulo : "Aguardando novo treino do seu personal"}</h2>
+              <p>
+                {activeRoutine
+                  ? `Objetivo: ${activeRoutine.objetivos}`
+                  : "Seu personal trainer ainda não vinculou uma rotina ativa à sua conta."}
+              </p>
+            </>
+          )}
         </div>
 
-        {activeRoutine && activeWeek && (
+        {(activeRoutine || isUnifiedCalendar) && activeWeek && (
           <div className="student-workouts__banner-summary">
             <span className="student-workouts__banner-week-pill">
               <Calendar size={14} aria-hidden="true" />
@@ -370,6 +417,8 @@ export default function StudentWorkouts() {
                 sessao.status === "CONCLUIDA" || sessao.status === "VALIDADA";
               const isNextPending = sessao.id === firstPendingSessionId && !isCompleted;
               const isHighlighted = sessao.id === highlightedSessionId;
+              const dateKey = sessao.dataPlanejadaIso || sessao.dataPlanejada;
+              const daySessionCount = dateKey ? dateCounts.get(dateKey) || 0 : 0;
 
               return (
                 <article
@@ -396,6 +445,12 @@ export default function StudentWorkouts() {
                       <div className="student-workouts__session-heading">
                         <div className="student-workouts__session-heading-row">
                           <h3>{sessionTitle}</h3>
+                          {isHybrid && sessao.modalidadeNome && (
+                            <SportTag sport={sportKeyFromName(sessao.modalidadeNome)} />
+                          )}
+                          {isUnifiedCalendar && daySessionCount > 1 && (
+                            <Badge tone="info">{daySessionCount} treinos no dia</Badge>
+                          )}
                           {isNextPending && (
                             <Badge tone="primary">Próximo treino</Badge>
                           )}
@@ -404,6 +459,9 @@ export default function StudentWorkouts() {
                           )}
                         </div>
                         <span className="student-workouts__session-week-tag">
+                          {isUnifiedCalendar && sessao.rotinaTitulo
+                            ? `${sessao.rotinaTitulo} · `
+                            : ""}
                           Semana {sessao.semana}
                           {sessao.dataReal ? ` · Realizada em ${sessao.dataReal}` : ""}
                         </span>

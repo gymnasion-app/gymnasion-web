@@ -146,3 +146,118 @@ test("alunoService endpoints match backend contract for ROLE_ALUNO", async () =>
     ]
   );
 });
+
+test("buildUnifiedCalendarWeeks groups hybrid athlete sessions by real civil Monday-Sunday weeks", () => {
+  const rSwim = {
+    id: "rot-swim",
+    titulo: "Travessia 1500m",
+    modalidade: "Natação",
+    modalidadeId: 1,
+    frequenciaSemanal: 2,
+    objetivos: "Resistência",
+    totalSemanas: 2,
+    semanaAtual: 1,
+  };
+  const rGym = {
+    id: "rot-gym",
+    titulo: "Força Geral",
+    modalidade: "Musculação",
+    modalidadeId: 2,
+    frequenciaSemanal: 2,
+    objetivos: "Potência",
+    totalSemanas: 2,
+    semanaAtual: 1,
+  };
+
+  assert.equal(model.getMondayIso("2026-10-14"), "2026-10-12");
+  assert.equal(model.addDaysIso("2026-10-12", 6), "2026-10-18");
+  assert.equal(model.sportKeyFromName("Musculação"), "academia");
+  assert.equal(model.sportKeyFromName("Natação"), "natacao");
+  assert.equal(model.sportKeyFromName("Pilates"), "Pilates");
+
+  const unified = model.buildUnifiedCalendarWeeks(
+    [
+      {
+        routine: rSwim,
+        weeks: [
+          {
+            numero: 2,
+            titulo: "Semana 2",
+            periodo: "Semana atual",
+            estado: "atual",
+            sessoes: [
+              {
+                id: "s-swim-tue",
+                numero: 1,
+                semana: 2,
+                diaSemana: "TER",
+                dataPlanejada: "13/10",
+                dataPlanejadaIso: "2026-10-13",
+                titulo: "Crawl 1200m",
+                descricao: "Série técnica",
+                duracaoPlanejada: 50,
+                status: "PLANEJADA",
+                destaque: false,
+                rpe: null,
+              },
+            ],
+          },
+        ],
+      },
+      {
+        routine: rGym,
+        weeks: [
+          {
+            numero: 1,
+            titulo: "Semana 1",
+            periodo: "Semana atual",
+            estado: "atual",
+            sessoes: [
+              {
+                id: "s-gym-tue",
+                numero: 1,
+                semana: 1,
+                diaSemana: "TER",
+                dataPlanejada: "13/10",
+                dataPlanejadaIso: "2026-10-13",
+                titulo: "Superior + Core",
+                descricao: "Fortalecimento",
+                duracaoPlanejada: 45,
+                status: "PLANEJADA",
+                destaque: false,
+                rpe: null,
+              },
+              {
+                id: "s-gym-prev",
+                numero: 1,
+                semana: 0,
+                diaSemana: "QUA",
+                dataPlanejada: "07/10",
+                dataPlanejadaIso: "2026-10-07",
+                titulo: "Adaptação",
+                descricao: "Leve",
+                duracaoPlanejada: 40,
+                status: "CONCLUIDA",
+                destaque: false,
+                rpe: 5,
+              },
+            ],
+          },
+        ],
+      },
+    ],
+    "2026-10-13"
+  );
+
+  assert.equal(unified.length, 2);
+  assert.equal(unified[0].estado, "anterior");
+  assert.equal(unified[0].sessoes[0].id, "s-gym-prev");
+  assert.equal(unified[1].estado, "atual");
+  assert.equal(unified[1].sessoes.length, 2);
+  assert.deepEqual(
+    Array.from(unified[1].sessoes, (s) => s.modalidadeNome),
+    ["Musculação", "Natação"]
+  );
+  assert.equal(unified[1].sessoes.filter((s) => s.destaque).length, 1);
+  assert.equal(model.filterStudentSessions(unified[1].sessoes, "musculacao").length, 1);
+});

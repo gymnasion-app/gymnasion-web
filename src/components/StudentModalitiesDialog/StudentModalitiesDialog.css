@@ -1,0 +1,17 @@
+.student-modalities-wrapper.workspace-dialog--wide {
+  width: min(560px, calc(100vw - 32px));
+}
+
+.student-modalities-dialog {
+  display: grid;
+  gap: 14px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.student-modalities-dialog__note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
