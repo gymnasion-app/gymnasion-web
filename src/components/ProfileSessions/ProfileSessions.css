@@ -54,9 +54,34 @@
   gap: 6px;
 }
 
-.profile-sessions__pills--weeks {
-  padding-left: 10px;
-  border-left: 1px solid var(--color-border);
+.profile-sessions__controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.profile-sessions__week-select {
+  min-block-size: 30px;
+  padding: 5px 28px 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+  color: var(--color-ink-700, #334155);
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.profile-sessions__week-select:hover {
+  border-color: var(--color-primary-300, #fdba74);
+}
+
+.profile-sessions__week-select:focus-visible {
+  outline: 2px solid var(--color-primary-600, #ea580c);
+  outline-offset: 2px;
 }
 
 .profile-sessions__pill {
@@ -153,6 +178,12 @@
 
 .profile-sessions__scroll {
   overflow-x: auto;
+  max-inline-size: 100%;
+}
+
+.profile-sessions__scroll:focus-visible {
+  outline: 2px solid var(--color-primary-600, #ea580c);
+  outline-offset: -2px;
 }
 
 .profile-sessions table {
@@ -160,6 +191,12 @@
   text-align: left;
   width: 100%;
   font-size: 13px;
+}
+
+.profile-sessions thead {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 1;
 }
 
 .profile-sessions th {
@@ -172,24 +209,24 @@
 
 .profile-sessions td,
 .profile-sessions th {
-  padding: 14px 18px;
+  padding: 12px 14px;
   border-bottom: 1px solid var(--color-border);
   white-space: nowrap;
 }
 
 .profile-sessions td {
   color: var(--color-ink-700);
-  max-width: 300px;
+  max-width: 280px;
   white-space: normal;
   overflow-wrap: anywhere;
-  min-width: 90px;
+  min-width: 72px;
 }
 
 .profile-sessions__session-cell {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  min-width: 180px;
+  min-width: 160px;
 }
 
 .profile-sessions__session-cell strong {
@@ -233,6 +270,10 @@
   gap: 4px;
 }
 
+.profile-sessions__status-badges > * {
+  white-space: nowrap;
+}
+
 .profile-sessions__rpe {
   padding: 3px 8px;
   border-radius: 6px;
@@ -269,11 +310,11 @@
     padding: 14px 16px;
   }
 
-  .profile-sessions__pills--weeks {
-    padding-left: 0;
-    border-left: none;
+  .profile-sessions__controls {
+    width: 100%;
   }
 
+  .profile-sessions__week-select,
   .profile-sessions__search {
     min-width: 100%;
     max-width: 100%;
