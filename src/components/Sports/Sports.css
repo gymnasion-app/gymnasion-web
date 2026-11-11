@@ -4,7 +4,7 @@
 .institutional-sports__heading > p { max-width: 360px; font-size: 17px; line-height: 1.5; color: var(--color-text-muted); }
 .institutional-sports__grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; margin-top: 48px; }
 .institutional-sports__card, .institutional-sports__more { position: relative; min-height: 420px; padding: 28px; border-radius: 24px; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; }
-.institutional-sports__card > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.institutional-sports__card > picture > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .institutional-sports__card::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgb(15 23 42 / 0%), rgb(15 23 42 / 85%)); }
 .institutional-sports__card > div { position: relative; z-index: 1; }
 .institutional-sports h3 { font-size: 28px; font-weight: 800; line-height: 1.18; letter-spacing: -.02em; }
