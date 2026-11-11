@@ -6,6 +6,7 @@ import Logo from "../../components/Logo/Logo";
 import { stravaService } from "../../services/stravaService";
 import { session } from "../../services/session";
 import { authError } from "../../utils/authError";
+import { sendStravaPopupCallback } from "../../features/strava/connectWithPopup";
 import "./StravaCallbackPage.css";
 
 export default function StravaCallbackPage() {
@@ -28,6 +29,8 @@ export default function StravaCallbackPage() {
     // Evita dupla chamada em React 18 StrictMode
     if (exchangeExecuted.current) return;
     exchangeExecuted.current = true;
+
+    if (sendStravaPopupCallback(window.location.search)) return;
 
     async function processCallback() {
       // 1. Verifica se usuário está autenticado no Gymnasion
