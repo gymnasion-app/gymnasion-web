@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
@@ -10,7 +10,6 @@ import {
   Check,
   X,
   Info,
-  CheckCircle2,
   Layers,
   ExternalLink,
   Copy,
@@ -20,13 +19,22 @@ import {
   ChevronUp,
   Sparkles,
   RotateCcw,
+  Search,
 } from "lucide-react";
 import Button from "../../components/Button/Button";
 import Badge from "../../components/Badge/Badge";
 import SportTag from "../../components/SportTag/SportTag";
 import FormField from "../../components/FormField/FormField";
+import WorkspaceDialog from "../../components/WorkspaceDialog/WorkspaceDialog";
+import MetricFormModal from "../../components/MetricModal/MetricFormModal";
 import { rotinaService } from "../../services/rotinaService";
-import { isRoutineActive, metricLabels } from "../../features/routines/routineModel";
+import { metricaService } from "../../services/metricaService";
+import {
+  filterAndSortRoutineMetrics,
+  getRequiredMetricIds,
+  isRoutineActive,
+  metricLabels,
+} from "../../features/routines/routineModel";
 import { getPreenchimentoLabel } from "../../features/metrics/metricModel";
 import { authError } from "../../utils/authError";
 import {
@@ -34,6 +42,7 @@ import {
   parseAtividades,
   serializeAtividades,
 } from "../../utils/activityParser";
+import type { MetricaResponseDTO } from "../../types/metric";
 import type {
   PlanejamentoRotinaResponseDTO,
   RotinaResponse,
@@ -89,10 +98,20 @@ const FORMAT_SNIPPETS = [
   { label: "🔥 PSE / Zona", text: " · PSE alvo 7-8" },
 ];
 
+const MAX_VISIBLE_METRICS = 3;
+
 function defaultPlannedDate(): string {
   const d = new Date();
   d.setDate(d.getDate() + 1);
   return d.toISOString().slice(0, 10);
+}
+
+function addDaysIso(iso?: string | null, days = 0): string {
+  if (!iso) return defaultPlannedDate();
+  const base = new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(base.getTime())) return iso;
+  base.setDate(base.getDate() + days);
+  return base.toISOString().slice(0, 10);
 }
 
 function formatDateBrWithWeekday(iso?: string | null): string {
@@ -148,8 +167,36 @@ export default function RoutineSessionPlanner() {
     "Descreva os exercícios em múltiplas linhas:\n• 4 × 12 Kettlebell Swing (descanso 45s)\n• 4 × 30s Corda Naval\n• 3 × 10 Burpees"
   );
 
-  // Controle de expansão dos cards de sessões da semana
+  // Controle de expansão, filtro e busca dos cards de sessões da semana
   const [expandedSessionIds, setExpandedSessionIds] = useState<Record<string, boolean>>({});
+  const [weekSessionFilter, setWeekSessionFilter] = useState<"all" | "pending" | "completed">(
+    "all"
+  );
+  const [weekSessionSearch, setWeekSessionSearch] = useState("");
+
+  // Métricas da modalidade para vínculo por sessão (0..N)
+  const [modalityMetrics, setModalityMetrics] = useState<MetricaResponseDTO[]>([]);
+  const [metricsLoading, setMetricsLoading] = useState(false);
+  const [metricsError, setMetricsError] = useState("");
+  const [metricSearch, setMetricSearch] = useState("");
+  const [selectedMetricIds, setSelectedMetricIds] = useState<Set<string>>(() => new Set());
+  const [creatingMetric, setCreatingMetric] = useState(false);
+
+  // Duplicação de semana (N -> N+1)
+  const [confirmingWeekDup, setConfirmingWeekDup] = useState(false);
+  const [duplicatingWeek, setDuplicatingWeek] = useState(false);
+
+  // Duplicação de sessão para outra semana/data
+  const [duplicatingSession, setDuplicatingSession] = useState<{
+    session: SessaoTreinoPlanejadaDTO;
+    headline: string;
+    originWeek: number;
+  } | null>(null);
+  const [dupTargetWeek, setDupTargetWeek] = useState<number>(1);
+  const [dupTargetDate, setDupTargetDate] = useState<string>("");
+  const [dupDateTouched, setDupDateTouched] = useState(false);
+  const [dupSubmitting, setDupSubmitting] = useState(false);
+  const [dupError, setDupError] = useState("");
 
   const loadData = useCallback(async () => {
     if (!routineId) return;
@@ -166,6 +213,25 @@ export default function RoutineSessionPlanner() {
       if (planningData.semanas && planningData.semanas.length > 0) {
         const weekNums = planningData.semanas.map((s) => s.numeroSemana);
         setExtraWeeks((prev) => Array.from(new Set([...prev, ...weekNums])).sort((a, b) => a - b));
+      }
+
+      const modId = routineData.modalidadeId ?? routineData.modalidade?.id;
+      if (modId) {
+        setMetricsLoading(true);
+        setMetricsError("");
+        metricaService
+          .listarPorModalidade(modId)
+          .then((data) => {
+            const activeList = (data || []).filter((m) => m.ativo);
+            setModalityMetrics(activeList);
+          })
+          .catch(() => {
+            setMetricsError("Não foi possível carregar as métricas da modalidade.");
+            setModalityMetrics([]);
+          })
+          .finally(() => {
+            setMetricsLoading(false);
+          });
       }
     } catch (err) {
       setError(authError(err, "Não foi possível carregar o planejamento da rotina.").message);
@@ -196,8 +262,49 @@ export default function RoutineSessionPlanner() {
     const completedOrValidated = currentWeekSessions.filter(
       (s) => s.validadaPersonal || s.concluidaAluno || s.status === "CONCLUIDA"
     ).length;
-    return { totalMinutes, completedOrValidated };
+    const pending = currentWeekSessions.length - completedOrValidated;
+    return { totalMinutes, completedOrValidated, pending };
   }, [currentWeekSessions]);
+
+  // Limpa filtros da barra lateral ao trocar de semana para evitar listas vazias acidentais
+  useEffect(() => {
+    setWeekSessionFilter("all");
+    setWeekSessionSearch("");
+  }, [selectedWeek]);
+
+  // Lista filtrada mantendo o índice ordinal (#1, #2, ...) original da semana
+  const indexedWeekSessions = useMemo(() => {
+    const normalizedQuery = weekSessionSearch.trim().toLowerCase();
+    return currentWeekSessions
+      .map((session, idx) => ({
+        session,
+        weekIndex: idx + 1,
+        preview: buildSessionCardPreview(session.atividades, idx + 1),
+        isDone: Boolean(session.concluidaAluno || session.status === "CONCLUIDA"),
+        isValidated: Boolean(session.validadaPersonal),
+      }))
+      .filter((item) => {
+        const isCompleted = item.isValidated || item.isDone;
+        if (weekSessionFilter === "pending" && isCompleted) return false;
+        if (weekSessionFilter === "completed" && !isCompleted) return false;
+        if (!normalizedQuery) return true;
+
+        const metricNames = (item.session.metricas || [])
+          .map((m) => m.titulo)
+          .join(" ")
+          .toLowerCase();
+        const blockText = item.preview.blocks
+          .map((b) => `${b.title} ${b.description}`)
+          .join(" ")
+          .toLowerCase();
+        return (
+          item.preview.headline.toLowerCase().includes(normalizedQuery) ||
+          blockText.includes(normalizedQuery) ||
+          metricNames.includes(normalizedQuery) ||
+          `#${item.weekIndex}`.includes(normalizedQuery)
+        );
+      });
+  }, [currentWeekSessions, weekSessionFilter, weekSessionSearch]);
 
   // Sessões de outras semanas para clonagem rápida quando a semana atual estiver vazia
   const previousWeeksSessions = useMemo(() => {
@@ -328,6 +435,29 @@ export default function RoutineSessionPlanner() {
     setAddingNewActivity(false);
   };
 
+  const visibleModalityMetrics = useMemo(() => {
+    return filterAndSortRoutineMetrics(modalityMetrics, selectedMetricIds, metricSearch);
+  }, [modalityMetrics, selectedMetricIds, metricSearch]);
+
+  const requiredMetricIds = useMemo(() => {
+    return getRequiredMetricIds(modalityMetrics);
+  }, [modalityMetrics]);
+
+  const modalityOptions = useMemo(() => {
+    const modId = routine?.modalidadeId ?? routine?.modalidade?.id;
+    const modName = routine?.nomeModalidade || routine?.modalidade?.nome || "Modalidade";
+    return modId ? [{ id: modId, nome: modName }] : [];
+  }, [routine?.modalidadeId, routine?.modalidade?.id, routine?.nomeModalidade, routine?.modalidade?.nome]);
+
+  const handleToggleMetric = (metricId: string) => {
+    setSelectedMetricIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(metricId)) next.delete(metricId);
+      else next.add(metricId);
+      return next;
+    });
+  };
+
   // Clonar / Usar uma sessão existente como base no formulário (Etapa 2)
   const handleUseSessionAsTemplate = (sess: SessaoTreinoPlanejadaDTO, sourceLabel?: string) => {
     const parsed = parseAtividades(sess.atividades);
@@ -358,9 +488,16 @@ export default function RoutineSessionPlanner() {
     setAddingNewActivity(false);
     setEditingActivityId(null);
 
+    const activeIds = new Set(modalityMetrics.map((m) => m.id));
+    const sourceMetricIds =
+      sess.metricas && sess.metricas.length > 0
+        ? sess.metricas.map((m) => m.id)
+        : sess.metricasIds || [];
+    setSelectedMetricIds(new Set(sourceMetricIds.filter((id) => activeIds.has(id))));
+
     toast.success(
       sourceLabel
-        ? `${sourceLabel} carregada no formulário! Ajuste a data ou blocos e salve.`
+        ? `${sourceLabel} carregada no formulário! Ajuste a data, blocos ou métricas e salve.`
         : "Sessão carregada como base no formulário!"
     );
 
@@ -375,6 +512,7 @@ export default function RoutineSessionPlanner() {
     setNewActDesc("");
     setAddingNewActivity(false);
     setEditingActivityId(null);
+    setSelectedMetricIds(new Set());
   };
 
   // Salvar Nova Sessão na Rotina (POST /api/personal-trainers/rotinas/{id}/sessoes)
@@ -426,6 +564,7 @@ export default function RoutineSessionPlanner() {
         dataPlanejada: plannedDate,
         duracao: durMin,
         atividades: serialized,
+        metricasIds: Array.from(selectedMetricIds),
       });
 
       toast.success(`Sessão #${currentWeekSessions.length + 1} salva na Semana ${selectedWeek}!`);
@@ -443,6 +582,70 @@ export default function RoutineSessionPlanner() {
       toast.error(authError(err, "Erro ao adicionar sessão à rotina.").message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const openDuplicateSessionModal = (sess: SessaoTreinoPlanejadaDTO, headline: string) => {
+    const nextWeek = selectedWeek < 104 ? selectedWeek + 1 : selectedWeek;
+    setDuplicatingSession({ session: sess, headline, originWeek: selectedWeek });
+    setDupTargetWeek(nextWeek);
+    setDupTargetDate(addDaysIso(sess.dataPlanejada, (nextWeek - selectedWeek) * 7));
+    setDupDateTouched(false);
+    setDupError("");
+  };
+
+  const handleConfirmDuplicateSession = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!duplicatingSession) return;
+
+    if (!Number.isInteger(dupTargetWeek) || dupTargetWeek < 1 || dupTargetWeek > 104) {
+      setDupError("A semana de destino deve estar entre 1 e 104.");
+      return;
+    }
+    if (!dupTargetDate) {
+      setDupError("Informe a data planejada de destino.");
+      return;
+    }
+
+    setDupSubmitting(true);
+    setDupError("");
+    try {
+      await rotinaService.duplicarSessao(duplicatingSession.session.id, {
+        semana: dupTargetWeek,
+        dataPlanejada: dupTargetDate,
+      });
+      toast.success(`Sessão duplicada para a Semana ${dupTargetWeek}!`);
+      setExtraWeeks((prev) =>
+        Array.from(new Set([...prev, dupTargetWeek])).sort((a, b) => a - b)
+      );
+      setSelectedWeek(dupTargetWeek);
+      setDuplicatingSession(null);
+      await loadData();
+    } catch (err) {
+      setDupError(authError(err, "Não foi possível duplicar a sessão.").message);
+    } finally {
+      setDupSubmitting(false);
+    }
+  };
+
+  const handleConfirmDuplicateWeek = async () => {
+    if (!routineId || selectedWeek >= 104) return;
+    setDuplicatingWeek(true);
+    try {
+      const updatedPlanning = await rotinaService.duplicarSemana(routineId, selectedWeek);
+      const targetWeek = selectedWeek + 1;
+      setPlanning(updatedPlanning);
+      const backendWeeks = (updatedPlanning.semanas || []).map((w) => w.numeroSemana);
+      setExtraWeeks((prev) =>
+        Array.from(new Set([...prev, ...backendWeeks, targetWeek])).sort((a, b) => a - b)
+      );
+      setSelectedWeek(targetWeek);
+      setConfirmingWeekDup(false);
+      toast.success(`Semana ${selectedWeek} duplicada para a Semana ${targetWeek}!`);
+    } catch (err) {
+      toast.error(authError(err, "Não foi possível duplicar a semana.").message);
+    } finally {
+      setDuplicatingWeek(false);
     }
   };
 
@@ -474,11 +677,13 @@ export default function RoutineSessionPlanner() {
   const plannedInWeek = currentWeekSessions.length;
   const progressPct = Math.min(100, Math.round((plannedInWeek / targetFreq) * 100));
   const firstStudent = routine.alunos?.[0];
+  const modalityIdNum = routine.modalidadeId ?? routine.modalidade?.id;
   const sportName = routine.nomeModalidade || routine.modalidade?.nome;
   const hasDraft =
     Boolean(sessionName.trim()) ||
     Boolean(orientations.trim()) ||
     activities.length > 0 ||
+    selectedMetricIds.size > 0 ||
     Boolean(newActTitle.trim()) ||
     Boolean(newActDesc.trim());
 
@@ -502,7 +707,7 @@ export default function RoutineSessionPlanner() {
             <SportTag sport={sportName} />
 
             <Badge tone={active ? "success" : "neutral"}>
-              {active ? "● Rotina ativa" : "● Rotina encerrada"}
+              {active ? "Rotina ativa" : "Rotina encerrada"}
             </Badge>
 
             <Badge tone="info">Meta: {targetFreq}× por semana</Badge>
@@ -587,10 +792,11 @@ export default function RoutineSessionPlanner() {
                   Faltam {targetFreq - plannedInWeek} para a meta semanal
                 </Badge>
               ) : plannedInWeek === targetFreq ? (
-                <Badge tone="success">● Meta semanal atingida</Badge>
+                <Badge tone="success">Meta semanal atingida</Badge>
               ) : (
                 <Badge tone="info">
-                  ● Meta atingida (+{plannedInWeek - targetFreq} sessão extra)
+                  Meta atingida (+{plannedInWeek - targetFreq}{" "}
+                  {plannedInWeek - targetFreq === 1 ? "sessão extra" : "sessões extras"})
                 </Badge>
               )}
             </div>
@@ -607,7 +813,7 @@ export default function RoutineSessionPlanner() {
       </section>
 
       {/* Grid Principal: Coluna Esquerda (Compositor de Nova Sessão) | Coluna Direita (Cronograma da Semana & Métricas) */}
-      <div className="session-planner__grid">
+      <div className={`session-planner__grid ${active ? "is-composer-active" : ""}`}>
         {/* Coluna Esquerda: Formulário de Nova Sessão */}
         <div className="session-planner__left-col" ref={formTopRef}>
           {!active ? (
@@ -936,7 +1142,140 @@ export default function RoutineSessionPlanner() {
                 )}
               </section>
 
-              {/* Card 3: Orientações ao aluno + Barra de Salvamento Unificada */}
+              {/* Card 3: Métricas acompanhadas nesta sessão (0..N) */}
+              <section
+                className="workspace-card session-planner__card"
+                aria-label="Métricas acompanhadas nesta sessão"
+              >
+                <fieldset className="session-planner__metrics-fieldset">
+                  <legend className="session-planner__metrics-legend">
+                    <span>
+                      Métricas acompanhadas nesta sessão ({selectedMetricIds.size})
+                    </span>
+                    {modalityIdNum && (
+                      <button
+                        type="button"
+                        className="session-planner__new-metric-btn"
+                        onClick={() => setCreatingMetric(true)}
+                      >
+                        <Plus size={13} /> Nova métrica
+                      </button>
+                    )}
+                  </legend>
+
+                  <p className="session-planner__metrics-hint">
+                    Opcional (0 a N) na modalidade {sportName || "da rotina"}. Sem seleção, o
+                    aluno registrará apenas RPE e duração.
+                  </p>
+
+                  {metricsLoading ? (
+                    <p className="session-planner__muted">Carregando métricas da modalidade...</p>
+                  ) : metricsError ? (
+                    <p className="session-planner__metrics-error" role="alert">
+                      {metricsError}
+                    </p>
+                  ) : modalityMetrics.length === 0 ? (
+                    <div className="session-planner__metrics-empty">
+                      <span>
+                        Nenhuma métrica ativa cadastrada para {sportName || "esta modalidade"}.
+                      </span>
+                      {modalityIdNum && (
+                        <Button
+                          variant="secondary"
+                          type="button"
+                          onClick={() => setCreatingMetric(true)}
+                        >
+                          + Cadastrar primeira métrica
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="session-planner__metrics-toolbar">
+                        <input
+                          type="search"
+                          className="session-planner__metrics-search"
+                          placeholder="Filtrar métricas da modalidade..."
+                          aria-label="Filtrar métricas da modalidade"
+                          value={metricSearch}
+                          onChange={(e) => setMetricSearch(e.target.value)}
+                        />
+                        <div className="session-planner__metrics-quick">
+                          {requiredMetricIds.length > 0 && (
+                            <button
+                              type="button"
+                              className="session-planner__quick-metric-btn"
+                              onClick={() =>
+                                setSelectedMetricIds(new Set(requiredMetricIds))
+                              }
+                            >
+                              Obrigatórias ({requiredMetricIds.length})
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="session-planner__quick-metric-btn"
+                            onClick={() =>
+                              setSelectedMetricIds(
+                                new Set(modalityMetrics.map((m) => m.id))
+                              )
+                            }
+                          >
+                            Todas ({modalityMetrics.length})
+                          </button>
+                          {selectedMetricIds.size > 0 && (
+                            <button
+                              type="button"
+                              className="session-planner__quick-metric-btn is-clear"
+                              onClick={() => setSelectedMetricIds(new Set())}
+                            >
+                              Limpar ({selectedMetricIds.size})
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {visibleModalityMetrics.length === 0 ? (
+                        <p className="session-planner__muted">
+                          Nenhuma métrica encontrada para “{metricSearch}”.
+                        </p>
+                      ) : (
+                        <div className="session-planner__metrics-picker">
+                          {visibleModalityMetrics.map((metric) => {
+                            const checked = selectedMetricIds.has(metric.id);
+                            return (
+                              <label
+                                key={metric.id}
+                                className={`session-planner__metric-option ${
+                                  checked ? "is-selected" : ""
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => handleToggleMetric(metric.id)}
+                                />
+                                <span className="metric-option__info">
+                                  <strong>{metric.titulo}</strong>
+                                  <small>
+                                    {metricLabels[metric.tipo] || metric.tipo} ·{" "}
+                                    {metric.obrigatoria !== false
+                                      ? "Obrigatória"
+                                      : "Opcional"}{" "}
+                                    · {getPreenchimentoLabel(metric.quemPreenche)}
+                                  </small>
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </fieldset>
+              </section>
+
+              {/* Card 4: Orientações ao aluno + Barra de Salvamento Unificada */}
               <section
                 className="workspace-card session-planner__card"
                 aria-label="Orientações e salvamento"
@@ -964,8 +1303,13 @@ export default function RoutineSessionPlanner() {
                       </strong>
                       <span>
                         {activities.length}{" "}
-                        {activities.length === 1 ? "bloco adicionado" : "blocos adicionados"} ·{" "}
-                        {duration || "45 min"} · {formatDateBrWithWeekday(plannedDate)}
+                        {activities.length === 1 ? "bloco" : "blocos"} ·{" "}
+                        {selectedMetricIds.size > 0
+                          ? `${selectedMetricIds.size} ${
+                              selectedMetricIds.size === 1 ? "métrica" : "métricas"
+                            }`
+                          : "apenas RPE e duração"}{" "}
+                        · {duration || "45 min"} · {formatDateBrWithWeekday(plannedDate)}
                       </span>
                     </div>
 
@@ -996,14 +1340,14 @@ export default function RoutineSessionPlanner() {
           )}
         </div>
 
-        {/* Coluna Direita: Sessões da Semana Selecionada & Métricas da Rotina */}
+        {/* Coluna Direita: Sessões da Semana Selecionada */}
         <div className="session-planner__right-col">
           {/* Card 1: Sessões já planejadas na Semana selecionada */}
           <section
-            className="workspace-card session-planner__card"
+            className="workspace-card session-planner__card session-planner__week-panel"
             aria-label={`Sessões da Semana ${selectedWeek}`}
           >
-            <header className="session-planner__card-head">
+            <header className="session-planner__card-head session-planner__week-panel-head">
               <div>
                 <h2>Sessões da Semana {selectedWeek}</h2>
                 <p>
@@ -1012,7 +1356,27 @@ export default function RoutineSessionPlanner() {
                     : `Cronograma planejado para a Semana ${selectedWeek}`}
                 </p>
               </div>
-              <Layers size={18} className="card-head-icon" />
+              <div className="session-planner__card-head-right">
+                {active && currentWeekSessions.length > 0 && (
+                  <button
+                    type="button"
+                    className="session-planner__dup-week-btn"
+                    disabled={selectedWeek >= 104 || duplicatingWeek}
+                    title={
+                      selectedWeek >= 104
+                        ? "Limite máximo de 104 semanas atingido"
+                        : `Duplicar Semana ${selectedWeek} para Semana ${selectedWeek + 1}`
+                    }
+                    onClick={() => setConfirmingWeekDup(true)}
+                  >
+                    <Copy size={13} />{" "}
+                    {selectedWeek >= 104
+                      ? "Limite (Sem. 104)"
+                      : `Duplicar Sem. ${selectedWeek} → ${selectedWeek + 1}`}
+                  </button>
+                )}
+                <Layers size={18} className="card-head-icon" />
+              </div>
             </header>
 
             {/* Resumo rápido de carga da semana */}
@@ -1034,6 +1398,72 @@ export default function RoutineSessionPlanner() {
                     {weekStats.completedOrValidated}/{currentWeekSessions.length}
                   </strong>
                 </div>
+              </div>
+            )}
+
+            {/* Filtros rápidos e busca quando há múltiplas sessões */}
+            {currentWeekSessions.length >= 2 && (
+              <div
+                className="week-sessions-toolbar"
+                aria-label="Filtrar e localizar sessões da semana"
+              >
+                <div
+                  className="week-sessions-filters"
+                  role="group"
+                  aria-label="Filtrar sessões por status"
+                >
+                  <button
+                    type="button"
+                    className={`week-filter-chip ${weekSessionFilter === "all" ? "is-active" : ""}`}
+                    aria-pressed={weekSessionFilter === "all"}
+                    onClick={() => setWeekSessionFilter("all")}
+                  >
+                    Todas <span>{currentWeekSessions.length}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`week-filter-chip ${
+                      weekSessionFilter === "pending" ? "is-active" : ""
+                    }`}
+                    aria-pressed={weekSessionFilter === "pending"}
+                    onClick={() => setWeekSessionFilter("pending")}
+                  >
+                    Pendentes <span>{weekStats.pending}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`week-filter-chip ${
+                      weekSessionFilter === "completed" ? "is-active" : ""
+                    }`}
+                    aria-pressed={weekSessionFilter === "completed"}
+                    onClick={() => setWeekSessionFilter("completed")}
+                  >
+                    Concluídas <span>{weekStats.completedOrValidated}</span>
+                  </button>
+                </div>
+
+                {currentWeekSessions.length >= 4 && (
+                  <div className="week-sessions-search">
+                    <Search size={14} className="week-sessions-search__icon" aria-hidden="true" />
+                    <input
+                      type="search"
+                      value={weekSessionSearch}
+                      onChange={(e) => setWeekSessionSearch(e.target.value)}
+                      placeholder="Buscar por título, exercício ou métrica..."
+                      aria-label="Buscar sessões desta semana"
+                    />
+                    {weekSessionSearch && (
+                      <button
+                        type="button"
+                        className="week-sessions-search__clear"
+                        aria-label="Limpar busca de sessões"
+                        onClick={() => setWeekSessionSearch("")}
+                      >
+                        <X size={13} />
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -1077,232 +1507,403 @@ export default function RoutineSessionPlanner() {
                 )}
               </div>
             ) : (
-              <div className="session-planner__week-sessions-list">
-                {currentWeekSessions.map((sess, idx) => {
-                  const preview = buildSessionCardPreview(sess.atividades, idx + 1);
-                  const isDone = Boolean(sess.concluidaAluno || sess.status === "CONCLUIDA");
-                  const isValidated = Boolean(sess.validadaPersonal);
-                  const isExpanded = Boolean(expandedSessionIds[sess.id]);
-
-                  const totalDescLines = preview.blocks.reduce(
-                    (acc, b) => acc + (b.description ? b.description.split("\n").length : 1),
-                    0
-                  );
-                  const hasLongContent =
-                    preview.blocks.length > 2 ||
-                    totalDescLines > 4 ||
-                    preview.blocks.some((b) => b.description.length > 120) ||
-                    Boolean(preview.orientations);
-
-                  const visibleBlocks = isExpanded
-                    ? preview.blocks
-                    : preview.blocks.slice(0, 2);
-
-                  return (
-                    <article
-                      key={sess.id}
-                      className={`week-session-card ${
-                        isValidated
-                          ? "is-validated"
-                          : isDone
-                          ? "is-completed"
-                          : "is-planned"
-                      }`}
+              <div
+                className="session-planner__week-sessions-scroll"
+                role="region"
+                aria-label={`Lista rolável de sessões da Semana ${selectedWeek}`}
+                tabIndex={0}
+              >
+                {indexedWeekSessions.length === 0 ? (
+                  <div className="week-sessions-no-match">
+                    <p>Nenhuma sessão encontrada com os filtros atuais.</p>
+                    <button
+                      type="button"
+                      className="week-session-btn-clone"
+                      onClick={() => {
+                        setWeekSessionFilter("all");
+                        setWeekSessionSearch("");
+                      }}
                     >
-                      <div className="week-session-card__top">
-                        <div className="week-session-card__title">
-                          <span className="session-index">#{idx + 1}</span>
-                          <strong>{preview.headline}</strong>
-                        </div>
-                        {isValidated ? (
-                          <Badge tone="success">● Validada</Badge>
-                        ) : isDone ? (
-                          <Badge tone="warning">● Concluída</Badge>
-                        ) : (
-                          <Badge tone="neutral">● Planejada</Badge>
-                        )}
-                      </div>
+                      <RotateCcw size={12} /> Limpar filtros
+                    </button>
+                  </div>
+                ) : (
+                  <div className="session-planner__week-sessions-list">
+                    {indexedWeekSessions.map(
+                      ({ session: sess, weekIndex, preview, isDone, isValidated }) => {
+                        const isExpanded = Boolean(expandedSessionIds[sess.id]);
 
-                      <div className="week-session-card__meta">
-                        <span>
-                          <Calendar size={13} /> {formatDateBrWithWeekday(sess.dataPlanejada)}
-                        </span>
-                        {sess.duracao && (
-                          <span>
-                            <Clock size={13} /> {sess.duracao} min
-                          </span>
-                        )}
-                        {preview.blocks.length > 0 && (
-                          <span className="meta-blocks-count">
-                            {preview.blocks.length}{" "}
-                            {preview.blocks.length === 1 ? "bloco" : "blocos"}
-                          </span>
-                        )}
-                      </div>
+                        const totalDescLines = preview.blocks.reduce(
+                          (acc, b) => acc + (b.description ? b.description.split("\n").length : 1),
+                          0
+                        );
+                        const hasLongContent =
+                          preview.blocks.length > 2 ||
+                          totalDescLines > 4 ||
+                          preview.blocks.some((b) => b.description.length > 120) ||
+                          Boolean(preview.orientations);
 
-                      {/* Blocos estruturados sem repetir o headline */}
-                      {visibleBlocks.length > 0 && (
-                        <div className="week-session-card__blocks">
-                          {visibleBlocks.map((block, bIdx) => {
-                            const showBlockTitle =
-                              block.title.trim().toLowerCase() !== "prescrição" &&
-                              block.title.trim() !== preview.headline.trim();
-                            return (
-                              <div key={block.id || bIdx} className="week-session-block">
-                                {showBlockTitle && (
-                                  <span className="week-session-block__title">
-                                    {bIdx + 1}. {block.title}
-                                  </span>
-                                )}
-                                {block.description && (
-                                  <p
-                                    className={`week-session-block__desc ${
-                                      !isExpanded ? "is-clamped" : ""
-                                    }`}
-                                  >
-                                    {block.description}
-                                  </p>
-                                )}
+                        const visibleBlocks = isExpanded
+                          ? preview.blocks
+                          : preview.blocks.slice(0, 2);
+
+                        return (
+                          <article
+                            key={sess.id}
+                            className={`week-session-card ${
+                              isValidated
+                                ? "is-validated"
+                                : isDone
+                                ? "is-completed"
+                                : "is-planned"
+                            }`}
+                          >
+                            <div className="week-session-card__top">
+                              <div className="week-session-card__title">
+                                <span className="session-index">#{weekIndex}</span>
+                                <strong>{preview.headline}</strong>
                               </div>
-                            );
-                          })}
+                              {isValidated ? (
+                                <Badge tone="success">Validada</Badge>
+                              ) : isDone ? (
+                                <Badge tone="warning">Concluída</Badge>
+                              ) : (
+                                <Badge tone="neutral">Planejada</Badge>
+                              )}
+                            </div>
 
-                          {!isExpanded && preview.blocks.length > 2 && (
-                            <span className="more-blocks-indicator">
-                              +{preview.blocks.length - 2} bloco(s) adicional(is)
-                            </span>
-                          )}
-                        </div>
-                      )}
+                            <div className="week-session-card__meta">
+                              <span>
+                                <Calendar size={13} /> {formatDateBrWithWeekday(sess.dataPlanejada)}
+                              </span>
+                              {sess.duracao && (
+                                <span>
+                                  <Clock size={13} /> {sess.duracao} min
+                                </span>
+                              )}
+                              {preview.blocks.length > 0 && (
+                                <span className="meta-blocks-count">
+                                  {preview.blocks.length}{" "}
+                                  {preview.blocks.length === 1 ? "bloco" : "blocos"}
+                                </span>
+                              )}
+                            </div>
 
-                      {/* Orientações (exibidas quando expandido ou se não houver blocos) */}
-                      {preview.orientations && (isExpanded || preview.blocks.length === 0) && (
-                        <div className="week-session-card__orientations">
-                          <strong>Orientações:</strong> {preview.orientations}
-                        </div>
-                      )}
-
-                      {/* Rodapé de ações do card: Expandir | Usar como base | Editar / Validar */}
-                      <div className="week-session-card__actions">
-                        <div className="week-session-card__left-actions">
-                          {hasLongContent && (
-                            <button
-                              type="button"
-                              className="week-session-btn-ghost"
-                              onClick={() =>
-                                setExpandedSessionIds((prev) => ({
-                                  ...prev,
-                                  [sess.id]: !prev[sess.id],
-                                }))
-                              }
-                            >
-                              {isExpanded ? (
+                            {/* Métricas vinculadas à sessão */}
+                            <div className="week-session-card__metrics">
+                              {sess.metricas && sess.metricas.length > 0 ? (
                                 <>
-                                  <ChevronUp size={13} /> Recolher
+                                  {sess.metricas.slice(0, MAX_VISIBLE_METRICS).map((m) => (
+                                    <span key={m.id} className="week-session-metric-pill">
+                                      {m.titulo}
+                                    </span>
+                                  ))}
+                                  {sess.metricas.length > MAX_VISIBLE_METRICS && (
+                                    <span
+                                      className="week-session-metric-more"
+                                      title={sess.metricas
+                                        .slice(MAX_VISIBLE_METRICS)
+                                        .map((m) => m.titulo)
+                                        .join(", ")}
+                                    >
+                                      +{sess.metricas.length - MAX_VISIBLE_METRICS}
+                                    </span>
+                                  )}
                                 </>
                               ) : (
-                                <>
-                                  <ChevronDown size={13} /> Detalhes
-                                </>
+                                <span className="week-session-metric-empty">
+                                  Apenas RPE e duração
+                                </span>
                               )}
-                            </button>
-                          )}
+                            </div>
 
-                          {active && (
-                            <button
-                              type="button"
-                              className="week-session-btn-clone"
-                              onClick={() =>
-                                handleUseSessionAsTemplate(sess, `Sessão #${idx + 1}`)
-                              }
-                              title="Copiar estrutura desta sessão para o formulário ao lado"
-                            >
-                              <Copy size={12} /> Usar como base
-                            </button>
-                          )}
-                        </div>
+                            {/* Blocos estruturados sem repetir o headline */}
+                            {visibleBlocks.length > 0 && (
+                              <div className="week-session-card__blocks">
+                                {visibleBlocks.map((block, bIdx) => {
+                                  const showBlockTitle =
+                                    block.title.trim().toLowerCase() !== "prescrição" &&
+                                    block.title.trim() !== preview.headline.trim();
+                                  return (
+                                    <div key={block.id || bIdx} className="week-session-block">
+                                      {showBlockTitle && (
+                                        <span className="week-session-block__title">
+                                          {bIdx + 1}. {block.title}
+                                        </span>
+                                      )}
+                                      {block.description && (
+                                        <p
+                                          className={`week-session-block__desc ${
+                                            !isExpanded ? "is-clamped" : ""
+                                          }`}
+                                        >
+                                          {block.description}
+                                        </p>
+                                      )}
+                                    </div>
+                                  );
+                                })}
 
-                        {firstStudent && (
-                          <div className="week-session-card__right-actions">
-                            {!isDone && !isValidated ? (
-                              <Link
-                                to={`/alunos/${firstStudent.id}/sessoes/${sess.id}/editar`}
-                                className="week-session-link"
-                              >
-                                <Edit2 size={13} /> Editar
-                              </Link>
-                            ) : (
-                              <Link
-                                to={`/alunos/${firstStudent.id}/sessoes/${sess.id}`}
-                                className="week-session-link"
-                              >
-                                <ExternalLink size={13} /> Ver execução
-                              </Link>
+                                {!isExpanded && preview.blocks.length > 2 && (
+                                  <span className="more-blocks-indicator">
+                                    +{preview.blocks.length - 2} bloco(s) adicional(is)
+                                  </span>
+                                )}
+                              </div>
                             )}
-                          </div>
-                        )}
-                      </div>
-                    </article>
-                  );
-                })}
+
+                            {/* Orientações (exibidas quando expandido ou se não houver blocos) */}
+                            {preview.orientations &&
+                              (isExpanded || preview.blocks.length === 0) && (
+                                <div className="week-session-card__orientations">
+                                  <strong>Orientações:</strong> {preview.orientations}
+                                </div>
+                              )}
+
+                            {/* Rodapé de ações do card: Expandir | Usar como base | Editar / Validar */}
+                            <div className="week-session-card__actions">
+                              <div className="week-session-card__left-actions">
+                                {hasLongContent && (
+                                  <button
+                                    type="button"
+                                    className="week-session-btn-ghost"
+                                    onClick={() =>
+                                      setExpandedSessionIds((prev) => ({
+                                        ...prev,
+                                        [sess.id]: !prev[sess.id],
+                                      }))
+                                    }
+                                  >
+                                    {isExpanded ? (
+                                      <>
+                                        <ChevronUp size={13} /> Recolher
+                                      </>
+                                    ) : (
+                                      <>
+                                        <ChevronDown size={13} /> Detalhes
+                                      </>
+                                    )}
+                                  </button>
+                                )}
+
+                                {active && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      className="week-session-btn-clone"
+                                      aria-label={`Usar sessão ${preview.headline} (${formatDateBrWithWeekday(sess.dataPlanejada)}) como base`}
+                                      onClick={() =>
+                                        handleUseSessionAsTemplate(sess, `Sessão #${weekIndex}`)
+                                      }
+                                      title="Copiar estrutura e métricas desta sessão para o formulário ao lado"
+                                    >
+                                      <Copy size={12} /> Usar como base
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="week-session-btn-clone"
+                                      aria-label={`Duplicar sessão ${preview.headline} (${formatDateBrWithWeekday(sess.dataPlanejada)})`}
+                                      onClick={() =>
+                                        openDuplicateSessionModal(sess, preview.headline)
+                                      }
+                                      title="Duplicar sessão para outra semana ou data"
+                                    >
+                                      <Copy size={12} /> Duplicar
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+
+                              {firstStudent && (
+                                <div className="week-session-card__right-actions">
+                                  {!isDone && !isValidated ? (
+                                    <Link
+                                      to={`/alunos/${firstStudent.id}/sessoes/${sess.id}/editar`}
+                                      className="week-session-link"
+                                    >
+                                      <Edit2 size={13} /> Editar
+                                    </Link>
+                                  ) : (
+                                    <Link
+                                      to={`/alunos/${firstStudent.id}/sessoes/${sess.id}`}
+                                      className="week-session-link"
+                                    >
+                                      <ExternalLink size={13} /> Ver execução
+                                    </Link>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </article>
+                        );
+                      }
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </section>
 
-          {/* Card 2: Métricas acompanhadas nesta rotina */}
-          <section
-            className="workspace-card session-planner__card"
-            aria-label="Métricas da rotina"
-          >
-            <header className="session-planner__card-head">
-              <div>
-                <h2>Métricas desta rotina</h2>
-                <p>
-                  Da modalidade {routine.nomeModalidade || routine.modalidade?.nome || "Esporte"} ·
-                  registradas em cada sessão
-                </p>
-              </div>
-            </header>
-
-            <div className="session-planner__metrics-list">
-              {routine.metricas && routine.metricas.length > 0 ? (
-                routine.metricas.map((m) => (
-                  <div key={m.id} className="planner-metric-item">
-                    <CheckCircle2 size={16} className="metric-check-icon" />
-                    <div className="metric-check-text">
-                      <strong>{m.titulo}</strong>
-                      <span className="metric-type-hint">
-                        {metricLabels[m.tipo] || m.tipo} · preenche:{" "}
-                        {getPreenchimentoLabel(m.quemPreenche)}
-                      </span>
-                    </div>
-                    <Badge tone={m.obrigatoria !== false ? "danger" : "info"}>
-                      {m.obrigatoria !== false ? "Obrigatória" : "Opcional"}
-                    </Badge>
-                  </div>
-                ))
-              ) : (
-                <p className="session-planner__muted">
-                  Nenhuma métrica vinculada a esta rotina.
-                </p>
-              )}
-            </div>
-          </section>
-
-          {/* Card 3: Informativo de Regras (US-09 C5 / US-10 C1 / US-21 C2) */}
+          {/* Card 2: Informativo de Regras (US-09 C5 / US-10 C1 / US-21 C2) */}
           <div className="session-planner__info-box" role="status">
             <Info size={20} className="info-icon" />
             <div>
               <strong>Planejamento semanal flexível</strong>
               <p>
                 A frequência de {targetFreq}× por semana serve como guia visual de planejamento,
-                mas você pode adicionar sessões extras se desejar. Para alunos em rotina ativa,
-                apenas a semana atual e a anterior ficam visíveis no aplicativo.
+                mas você pode adicionar ou duplicar sessões e semanas livremente. Cada sessão define
+                suas próprias métricas (0 a N); para alunos ativos, ficam visíveis a semana atual e
+                a anterior no aplicativo.
               </p>
             </div>
           </div>
         </div>
       </div>
+
+      {modalityIdNum && (
+        <MetricFormModal
+          mode="create"
+          isOpen={creatingMetric}
+          onClose={() => setCreatingMetric(false)}
+          modalidades={modalityOptions}
+          defaultModalidadeId={modalityIdNum}
+          existingMetrics={modalityMetrics}
+          onSuccess={(created) => {
+            setCreatingMetric(false);
+            setModalityMetrics((prev) => [...prev, created]);
+            setSelectedMetricIds((prev) => new Set(prev).add(created.id));
+          }}
+        />
+      )}
+
+      {confirmingWeekDup && (
+        <WorkspaceDialog
+          title={`Duplicar Semana ${selectedWeek} para Semana ${selectedWeek + 1}?`}
+          description={`Todas as ${currentWeekSessions.length} sessões planejadas da Semana ${selectedWeek} serão copiadas com data +7 dias, mantendo blocos, duração e métricas vinculadas.`}
+          icon="/design-system/imgIconDumbbell.svg"
+          busy={duplicatingWeek}
+          onClose={() => {
+            if (!duplicatingWeek) setConfirmingWeekDup(false);
+          }}
+          actions={
+            <>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={duplicatingWeek}
+                onClick={() => setConfirmingWeekDup(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                loading={duplicatingWeek}
+                disabled={duplicatingWeek}
+                onClick={() => void handleConfirmDuplicateWeek()}
+              >
+                Confirmar duplicação
+              </Button>
+            </>
+          }
+        >
+          <p className="session-planner__dup-modal-note">
+            Se a Semana {selectedWeek + 1} ainda não existir nas abas, ela será adicionada
+            automaticamente ao planejamento da rotina.
+          </p>
+        </WorkspaceDialog>
+      )}
+
+      {duplicatingSession && (
+        <WorkspaceDialog
+          title={`Duplicar “${duplicatingSession.headline}”`}
+          description="Escolha a semana e a data de destino. As atividades, duração e métricas serão copiadas."
+          icon="/design-system/imgIconDumbbell.svg"
+          busy={dupSubmitting}
+          onClose={() => {
+            if (!dupSubmitting) setDuplicatingSession(null);
+          }}
+          actions={
+            <>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={dupSubmitting}
+                onClick={() => setDuplicatingSession(null)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                form="duplicate-session-form"
+                variant="primary"
+                loading={dupSubmitting}
+                disabled={dupSubmitting}
+              >
+                Duplicar sessão
+              </Button>
+            </>
+          }
+        >
+          <form
+            id="duplicate-session-form"
+            className="session-planner__dup-form"
+            onSubmit={(e) => void handleConfirmDuplicateSession(e)}
+          >
+            <div className="session-planner__dup-fields">
+              <div className="session-planner__dup-field">
+                <label htmlFor="dup-session-week">Semana de destino (1 a 104) *</label>
+                <input
+                  id="dup-session-week"
+                  type="number"
+                  min={1}
+                  max={104}
+                  required
+                  disabled={dupSubmitting}
+                  aria-invalid={Boolean(dupError)}
+                  aria-describedby={dupError ? "dup-session-error" : undefined}
+                  value={dupTargetWeek}
+                  onChange={(e) => {
+                    const nextWeek = Number(e.target.value) || 1;
+                    setDupTargetWeek(nextWeek);
+                    if (!dupDateTouched) {
+                      setDupTargetDate(
+                        addDaysIso(
+                          duplicatingSession.session.dataPlanejada,
+                          (nextWeek - duplicatingSession.originWeek) * 7
+                        )
+                      );
+                    }
+                  }}
+                />
+              </div>
+
+              <div className="session-planner__dup-field">
+                <label htmlFor="dup-session-date">Data planejada *</label>
+                <input
+                  id="dup-session-date"
+                  type="date"
+                  required
+                  disabled={dupSubmitting}
+                  aria-invalid={Boolean(dupError)}
+                  aria-describedby={dupError ? "dup-session-error" : undefined}
+                  value={dupTargetDate}
+                  onChange={(e) => {
+                    setDupDateTouched(true);
+                    setDupTargetDate(e.target.value);
+                  }}
+                />
+              </div>
+            </div>
+
+            {dupError && (
+              <p id="dup-session-error" className="workspace-dialog__error" role="alert">
+                {dupError}
+              </p>
+            )}
+          </form>
+        </WorkspaceDialog>
+      )}
     </div>
   );
 }

@@ -28,6 +28,7 @@ export interface StudentWorkoutSession {
   destaque?: boolean;
   rpe?: number | null;
   resultados?: StudentSessionMetricResult[];
+  metricas?: StudentExecutionMetricDTO[];
   rotinaTreinoId?: string;
   rotinaTitulo?: string;
   modalidadeId?: number;

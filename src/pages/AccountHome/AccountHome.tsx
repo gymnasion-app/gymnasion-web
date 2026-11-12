@@ -114,17 +114,36 @@ export default function AccountHome() {
     : 0;
   const totalDaysInWeek = currentWeek ? currentWeek.sessoes.length : 0;
 
+  const displayedRoutineIds = useMemo(
+    () => new Set(displayedRoutines.map((r) => r.id)),
+    [displayedRoutines]
+  );
+
   const studentMetrics = useMemo(() => {
     const map = new Map<string, StudentExecutionMetricDTO>();
-    for (const r of displayedRoutines) {
-      for (const m of r.metricas || []) {
-        if (m.quemPreenche !== "PERSONAL" && !map.has(m.id)) {
-          map.set(m.id, m);
+    for (const w of weeks) {
+      for (const s of w.sessoes) {
+        if (s.rotinaTreinoId && displayedRoutineIds.size > 0 && !displayedRoutineIds.has(s.rotinaTreinoId)) {
+          continue;
+        }
+        for (const m of s.metricas || []) {
+          if (m.quemPreenche !== "PERSONAL" && !map.has(m.id)) {
+            map.set(m.id, m);
+          }
+        }
+      }
+    }
+    if (map.size === 0) {
+      for (const r of displayedRoutines) {
+        for (const m of r.metricas || []) {
+          if (m.quemPreenche !== "PERSONAL" && !map.has(m.id)) {
+            map.set(m.id, m);
+          }
         }
       }
     }
     return [...map.values()];
-  }, [displayedRoutines]);
+  }, [weeks, displayedRoutines, displayedRoutineIds]);
 
   // Calcula dados reais para o card "Minha evolução" a partir das sessões finalizadas
   const evolutionSummary = useMemo(() => {

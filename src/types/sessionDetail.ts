@@ -68,6 +68,7 @@ export interface AtualizarSessaoTreinoPayload {
   dataPlanejada: string;
   duracao?: number | null;
   atividades?: string | null;
+  metricasIds?: string[];
 }
 
 export interface ObservacaoFeedbackResponse {

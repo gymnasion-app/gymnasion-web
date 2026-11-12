@@ -15,7 +15,10 @@ function load(path, dependencies = {}) {
   return exports;
 }
 
-const model = load("features/studentArea/studentAreaModel.ts");
+const activityParser = load("utils/activityParser.ts");
+const model = load("features/studentArea/studentAreaModel.ts", {
+  "../../utils/activityParser": activityParser,
+});
 
 test("getBorgInfo returns exact Borg CR-10 descriptors and handles null", () => {
   const level7 = model.getBorgInfo(7);
@@ -260,4 +263,54 @@ test("buildUnifiedCalendarWeeks groups hybrid athlete sessions by real civil Mon
   );
   assert.equal(unified[1].sessoes.filter((s) => s.destaque).length, 1);
   assert.equal(model.filterStudentSessions(unified[1].sessoes, "musculacao").length, 1);
+});
+
+test("mapPlanningToWeeks maps session-level metrics onto StudentWorkoutSession including 0-metric sessions", () => {
+  const rotina = {
+    id: "r1",
+    titulo: "Travessia",
+    nomeModalidade: "Natação",
+    modalidadeId: 1,
+    frequenciaSemanal: 2,
+    objetivos: "Base",
+    metricas: [],
+  };
+  const planejamento = [
+    {
+      numeroSemana: 1,
+      sessoes: [
+        {
+          id: "s1",
+          semana: 1,
+          dataPlanejada: "2026-10-12",
+          duracao: 45,
+          atividades: "Técnica",
+          status: "PLANEJADA",
+          metricas: [
+            {
+              id: "m1",
+              titulo: "Tempo 400m",
+              tipo: "TEMPO",
+              obrigatoria: true,
+              quemPreenche: "ALUNO",
+            },
+          ],
+        },
+        {
+          id: "s2",
+          semana: 1,
+          dataPlanejada: "2026-10-14",
+          duracao: 30,
+          atividades: "Soltura",
+          status: "PLANEJADA",
+          metricas: [],
+        },
+      ],
+    },
+  ];
+
+  const mapped = model.mapPlanningToWeeks(rotina, planejamento);
+  assert.equal(mapped.weeks[0].sessoes[0].metricas.length, 1);
+  assert.equal(mapped.weeks[0].sessoes[0].metricas[0].id, "m1");
+  assert.equal(mapped.weeks[0].sessoes[1].metricas.length, 0);
 });

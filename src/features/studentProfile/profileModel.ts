@@ -88,6 +88,8 @@ export function buildActiveRoutineSessions(
         validadaPersonal: s.validadaPersonal,
         temPendenciasPersonal: s.temPendenciasPersonal,
         quantidadePendenciasPersonal: s.quantidadePendenciasPersonal,
+        metricasIds: s.metricasIds,
+        metricas: s.metricas,
         desempenho: s.desempenho,
       });
     }
@@ -147,12 +149,6 @@ export function buildTrackingFromPlanning(
     }
   }
 
-  const personalRequiredMetrics = (routine.metricas || []).filter(
-    (m) =>
-      (m.quemPreenche === "PERSONAL" || m.quemPreenche === "AMBOS") &&
-      m.obrigatoria !== false
-  );
-
   let quantidadeMetricasPendentes = 0;
 
   const sessoes: StudentTracking["sessoes"] = plannedSessions
@@ -161,6 +157,11 @@ export function buildTrackingFromPlanning(
       const matched = matchedByPlannedId.get(s.id);
       const isCompleted = Boolean(matched);
       const desempenho = matched?.desempenho ?? null;
+      const personalRequiredMetrics = (s.metricas || []).filter(
+        (m) =>
+          (m.quemPreenche === "PERSONAL" || m.quemPreenche === "AMBOS") &&
+          m.obrigatoria !== false
+      );
 
       const pendingPersonalCount = isCompleted
         ? personalRequiredMetrics.filter((m) => {
@@ -183,6 +184,8 @@ export function buildTrackingFromPlanning(
         validadaPersonal: matched?.validadaPersonal ?? false,
         temPendenciasPersonal: pendingPersonalCount > 0,
         quantidadePendenciasPersonal: pendingPersonalCount,
+        metricasIds: s.metricasIds,
+        metricas: s.metricas,
         desempenho,
       };
     });

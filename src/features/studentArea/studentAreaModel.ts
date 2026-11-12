@@ -356,6 +356,14 @@ export function mapPlanningToWeeks(
         rotinaTitulo: info.titulo,
         modalidadeId: info.modalidadeId,
         modalidadeNome: info.modalidade,
+        metricas: (s.metricas || []).map((m) => ({
+          id: m.id,
+          titulo: m.titulo,
+          tipo: m.tipo,
+          obrigatoria: Boolean(m.obrigatoria),
+          quemPreenche: (m.quemPreenche || "ALUNO") as "PERSONAL" | "ALUNO" | "AMBOS",
+          campoStrava: m.campoStrava,
+        })),
         resultados: (s.desempenho?.metricas || []).map((m) => ({
           metricaId: m.metricaId,
           titulo: m.titulo || m.tituloMetrica || "Métrica",

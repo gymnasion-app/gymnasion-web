@@ -8,6 +8,8 @@ import type { RotinaResponse } from "../../types/rotina";
 import type { StudentTracking } from "../../types/studentProfile";
 import "./ProfileRoutineCard.css";
 
+const MAX_VISIBLE_METRICS = 3;
+
 export default function ProfileRoutineCard({
   routine,
   tracking,
@@ -70,18 +72,36 @@ export default function ProfileRoutineCard({
         </div>
       </header>
       <div className="profile-routine__metrics">
-        {routine.metricas.map((metric) => {
-          const filler = metric.quemPreenche ? fillerLabel[metric.quemPreenche] || metric.quemPreenche : "";
-          const obrigLabel = metric.obrigatoria !== false ? "Obrigatória" : "Opcional";
-          const tooltip = `${metric.titulo} (${metricLabels[metric.tipo]}) — ${obrigLabel}${filler ? ` · Preenchido por: ${filler}` : ""}`;
-          return (
-            <span key={metric.id} title={tooltip}>
-              <img src={"/student-profile/" + metricIcons[metric.tipo] + ".svg"} alt="" />
-              <strong>{metric.titulo}</strong>
-              <small>· {metricLabels[metric.tipo]}</small>
-            </span>
-          );
-        })}
+        {(routine.metricas || []).length === 0 ? (
+          <span title="Apenas RPE e duração registrados nas sessões">
+            Apenas RPE e duração
+          </span>
+        ) : (
+          <>
+            {(routine.metricas || []).slice(0, MAX_VISIBLE_METRICS).map((metric) => {
+              const filler = metric.quemPreenche ? fillerLabel[metric.quemPreenche] || metric.quemPreenche : "";
+              const obrigLabel = metric.obrigatoria !== false ? "Obrigatória" : "Opcional";
+              const tooltip = `${metric.titulo} (${metricLabels[metric.tipo]}) — ${obrigLabel}${filler ? ` · Preenchido por: ${filler}` : ""}`;
+              return (
+                <span key={metric.id} title={tooltip}>
+                  <img src={"/student-profile/" + metricIcons[metric.tipo] + ".svg"} alt="" />
+                  <strong>{metric.titulo}</strong>
+                  <small>· {metricLabels[metric.tipo]}</small>
+                </span>
+              );
+            })}
+            {(routine.metricas || []).length > MAX_VISIBLE_METRICS && (
+              <span
+                title={(routine.metricas || [])
+                  .slice(MAX_VISIBLE_METRICS)
+                  .map((m) => m.titulo)
+                  .join(", ")}
+              >
+                +{(routine.metricas || []).length - MAX_VISIBLE_METRICS}
+              </span>
+            )}
+          </>
+        )}
       </div>
       {showWeek && Boolean(tracking && tracking.rotinaAtivaId === routine.id && tracking.sessoes.length > 0) && (
         <>

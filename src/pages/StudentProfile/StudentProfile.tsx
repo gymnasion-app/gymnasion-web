@@ -134,7 +134,7 @@ function StudentProfileContent({studentId}:{studentId:string}) {
       ].map(m=>[m.id,m])
     ).values(),
   ];
-  const allMetrics=[...new Map(routines.flatMap(r=>r.metricas).map(m=>[m.id,m])).values()];
+  const allMetrics=[...new Map([...routines.flatMap(r=>r.metricas||[]),...activeRoutineSessions.flatMap(s=>s.metricas||[])].map(m=>[m.id,m])).values()];
   const today=localDateKey(new Date());
   const month=sessions.filter(s=>s.dataReal?.slice(0,7)===today.slice(0,7)&&s.dataReal<=today);
   const efforts=month.map(s=>s.desempenho?.nivelCansaco).filter((v):v is number=>typeof v==="number");

@@ -1,3 +1,5 @@
+import type { RoutineMetricSummary } from "./rotina";
+
 export interface PersonalNotification {
   id: string;
   titulo: string;
@@ -18,6 +20,8 @@ export interface TrainingSession {
   status: "PLANEJADA" | "CONCLUIDA" | "CANCELADA";
   concluidaAluno: boolean;
   validadaPersonal: boolean;
+  metricasIds?: string[];
+  metricas?: RoutineMetricSummary[];
   temPendenciasPersonal?: boolean;
   quantidadePendenciasPersonal?: number;
   desempenho: {

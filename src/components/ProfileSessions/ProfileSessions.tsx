@@ -172,11 +172,18 @@ export default function ProfileSessions({
   const current = Math.min(page, pages);
   const displayed = filteredSessions.slice((current - 1) * pageSize, current * pageSize);
 
-  // Colunas de métricas (prioriza as métricas da rotina ativa quando em recent)
+  // Colunas de métricas (derivadas das sessões visíveis com fallback na rotina ativa)
   const metrics = useMemo(() => {
-    if (recent && activeRoutine) {
-      return activeRoutine.metricas
-        .filter((m) => m.tipo !== "TEXTO")
+    if (recent) {
+      const plannedSessionMetrics = filteredSessions.flatMap((s) => s.metricas || []);
+      const fallbackRoutineMetrics = activeRoutine?.metricas || [];
+      const source =
+        plannedSessionMetrics.length > 0 ? plannedSessionMetrics : fallbackRoutineMetrics;
+      return [
+        ...new Map(
+          source.filter((m) => m.tipo !== "TEXTO").map((m) => [m.id, m])
+        ).values(),
+      ]
         .slice(0, 2)
         .map((m) => ({
           metricaId: m.id,
@@ -191,9 +198,7 @@ export default function ProfileSessions({
           .map((m) => [m.metricaId, m])
       ).values(),
     ];
-    return recent
-      ? allMetrics.filter((m) => m.tipoMetrica !== "TEXTO").slice(0, 2)
-      : allMetrics.filter((m) => m.tipoMetrica !== "TEXTO").slice(0, 3);
+    return allMetrics.filter((m) => m.tipoMetrica !== "TEXTO").slice(0, 3);
   }, [recent, activeRoutine, filteredSessions]);
 
   const handleRowClick = (sessionId: string) => {

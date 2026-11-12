@@ -4,6 +4,7 @@ import { unpackPage } from "../types/api";
 import type {
   CriarRotinaPayload,
   CriarSessaoTreinoPayload,
+  DuplicarSessaoPayload,
   PlanejamentoRotinaResponseDTO,
   ReutilizarRotinaPayload,
   RotinaResponse,
@@ -84,6 +85,21 @@ export const rotinaService = {
 
   async adicionarSessao(id: string, payload: CriarSessaoTreinoPayload): Promise<SessaoTreinoPlanejadaDTO> {
     const { data } = await api.post<SessaoTreinoPlanejadaDTO>(`${BASE_URL}/${id}/sessoes`, payload);
+    return data;
+  },
+
+  async duplicarSessao(sessaoId: string, payload: DuplicarSessaoPayload): Promise<SessaoTreinoPlanejadaDTO> {
+    const { data } = await api.post<SessaoTreinoPlanejadaDTO>(
+      `${BASE_URL}/sessoes/${encodeURIComponent(sessaoId)}/duplicar`,
+      payload
+    );
+    return data;
+  },
+
+  async duplicarSemana(id: string, semanaOrigem: number): Promise<PlanejamentoRotinaResponseDTO> {
+    const { data } = await api.post<PlanejamentoRotinaResponseDTO>(
+      `${BASE_URL}/${encodeURIComponent(id)}/semanas/${semanaOrigem}/duplicar`
+    );
     return data;
   },
 };

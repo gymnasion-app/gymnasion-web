@@ -6,12 +6,6 @@ import type { MetricaResponseDTO } from "../../types/metric";
 import type { ModalidadeResponseDTO } from "../../types/modalidade";
 import { handleApiError } from "../../utils/handleApiError";
 import {
-  NEW_ROUTINE_DRAFT_KEY,
-  mergeCreatedMetricIntoDraft,
-  parseNewRoutineDraft,
-  serializeNewRoutineDraft,
-} from "../../features/routines/routineModel";
-import {
   filterMetrics,
   getMarketMetricPresets,
   getMetricStudentCount,
@@ -352,22 +346,6 @@ export const Metrics: React.FC = () => {
     setAllMetrics((prev) => [newMetric, ...prev]);
 
     if (returnToParam && returnToParam.startsWith("/")) {
-      try {
-        const existingDraft = parseNewRoutineDraft(
-          window.sessionStorage.getItem(NEW_ROUTINE_DRAFT_KEY)
-        );
-        const updatedDraft = mergeCreatedMetricIntoDraft(
-          existingDraft,
-          newMetric.id,
-          newMetric.modalidadeId
-        );
-        window.sessionStorage.setItem(
-          NEW_ROUTINE_DRAFT_KEY,
-          serializeNewRoutineDraft(updatedDraft)
-        );
-      } catch {
-        // Ignora falhas de sessionStorage em modo privado restrito
-      }
       navigate(returnToParam);
     }
   }

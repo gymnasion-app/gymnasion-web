@@ -75,7 +75,7 @@ export default function SessionCorrectionModal({
               {studentName} · Sessão {session.semana} · Auditoria de alterações
             </p>
           </div>
-          <button className="correction-modal__close" onClick={onClose} aria-label="Fechar modal">
+          <button type="button" className="correction-modal__close" onClick={onClose} aria-label="Fechar modal">
             <X size={20} />
           </button>
         </header>
@@ -96,46 +96,55 @@ export default function SessionCorrectionModal({
 
             <div className="correction-modal__metrics-section">
               <h3>Métricas e resultados</h3>
-              <p className="correction-modal__subtitle">
-                Corrija os valores registrados ou preencha as métricas pendentes do personal.
-              </p>
+              {session.metricas.length === 0 ? (
+                <p className="correction-modal__subtitle">
+                  Esta sessão foi executada sem métricas customizadas (apenas RPE e duração). Você
+                  pode corrigir a data real e as observações abaixo.
+                </p>
+              ) : (
+                <>
+                  <p className="correction-modal__subtitle">
+                    Corrija os valores registrados ou preencha as métricas pendentes do personal.
+                  </p>
 
-              <div className="correction-modal__metrics-list">
-                {session.metricas.map((m) => (
-                  <div key={m.metricaId} className="correction-modal__metric-item">
-                    <FormField
-                      id={`metric-${m.metricaId}`}
-                      label={`${m.titulo}${m.obrigatoria ? " *" : " (Opcional)"}`}
-                      hint={`Tipo: ${m.tipo} · ${m.obrigatoria ? "Obrigatória" : "Opcional"} · ${
-                        m.quemPreenche === "PERSONAL"
-                          ? "Exclusiva do personal"
-                          : m.quemPreenche === "ALUNO"
-                          ? "Preenchimento do aluno"
-                          : "Ambos preenchem"
-                      }${
-                        !m.correcaoPermitida && !m.inclusaoPermitida
-                          ? " (métrica opcional não preenchida pelo aluno)"
-                          : ""
-                      }`}
-                      value={metricValues[m.metricaId] ?? ""}
-                      onChange={(e) =>
-                        setMetricValues((prev) => ({
-                          ...prev,
-                          [m.metricaId]: e.target.value,
-                        }))
-                      }
-                      placeholder={
-                        m.tipo === "TEMPO"
-                          ? "mm:ss ou hh:mm:ss (ex.: 01:42 ou 01:15:30)"
-                          : m.tipo === "FREQUENCIA_CARDIACA"
-                          ? "Entre 30 e 250 bpm"
-                          : "Informe o valor"
-                      }
-                      disabled={!m.correcaoPermitida && !m.inclusaoPermitida}
-                    />
+                  <div className="correction-modal__metrics-list">
+                    {session.metricas.map((m) => (
+                      <div key={m.metricaId} className="correction-modal__metric-item">
+                        <FormField
+                          id={`metric-${m.metricaId}`}
+                          label={`${m.titulo}${m.obrigatoria ? " *" : " (Opcional)"}`}
+                          hint={`Tipo: ${m.tipo} · ${m.obrigatoria ? "Obrigatória" : "Opcional"} · ${
+                            m.quemPreenche === "PERSONAL"
+                              ? "Exclusiva do personal"
+                              : m.quemPreenche === "ALUNO"
+                              ? "Preenchimento do aluno"
+                              : "Ambos preenchem"
+                          }${
+                            !m.correcaoPermitida && !m.inclusaoPermitida
+                              ? " (métrica opcional não preenchida pelo aluno)"
+                              : ""
+                          }`}
+                          value={metricValues[m.metricaId] ?? ""}
+                          onChange={(e) =>
+                            setMetricValues((prev) => ({
+                              ...prev,
+                              [m.metricaId]: e.target.value,
+                            }))
+                          }
+                          placeholder={
+                            m.tipo === "TEMPO"
+                              ? "mm:ss ou hh:mm:ss (ex.: 01:42 ou 01:15:30)"
+                              : m.tipo === "FREQUENCIA_CARDIACA"
+                              ? "Entre 30 e 250 bpm"
+                              : "Informe o valor"
+                          }
+                          disabled={!m.correcaoPermitida && !m.inclusaoPermitida}
+                        />
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </>
+              )}
             </div>
 
             <div className="correction-modal__field-group">

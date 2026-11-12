@@ -53,3 +53,22 @@ test('session registration sends the selected student and optional RPE to the ex
   assert.equal((await studentProfileService.execute('session',payload)).id,'session');
   assert.equal(request[0],'/api/personal-trainers/rotinas/sessoes/session/execucao');assert.equal(request[1],payload);
 });
+test('buildTrackingFromPlanning evaluates pending metrics per session and handles 0-metric sessions',()=>{
+  const routine={id:'r1',titulo:'Corrida Base',frequenciaSemanal:2,ativo:true,alunos:[],metricas:[]};
+  const planning={
+    semanas:[{
+      numeroSemana:1,
+      sessoes:[
+        {id:'s1',semana:1,dataPlanejada:'2026-10-10',duracao:40,atividades:'Tiros',status:'PLANEJADA',metricasIds:['m1'],metricas:[{id:'m1',titulo:'FC Média',tipo:'FREQUENCIA_CARDIACA',obrigatoria:true,quemPreenche:'PERSONAL'}]},
+        {id:'s2',semana:1,dataPlanejada:'2026-10-12',duracao:30,atividades:'Regenerativo',status:'PLANEJADA',metricasIds:[],metricas:[]},
+      ]
+    }]
+  };
+  const history=[{id:'s1',rotinaTreinoId:'r1',semana:1,dataPlanejada:'2026-10-10',dataReal:'2026-10-10',duracao:40,status:'CONCLUIDA',concluidaAluno:true,validadaPersonal:false,desempenho:{alunoId:'a',nivelCansaco:6,metricas:[]}},{id:'s2',rotinaTreinoId:'r1',semana:1,dataPlanejada:'2026-10-12',dataReal:'2026-10-12',duracao:30,status:'CONCLUIDA',concluidaAluno:true,validadaPersonal:false,desempenho:{alunoId:'a',nivelCansaco:4,metricas:[]}}];
+  const tracking=model.buildTrackingFromPlanning('a',routine,planning,history);
+  assert.equal(tracking.quantidadeMetricasPendentes,1);
+  assert.equal(tracking.sessoes[0].quantidadePendenciasPersonal,1);
+  assert.equal(tracking.sessoes[1].quantidadePendenciasPersonal,0);
+  assert.deepEqual(tracking.sessoes[0].metricasIds,['m1']);
+  assert.deepEqual(tracking.sessoes[1].metricas,[]);
+});

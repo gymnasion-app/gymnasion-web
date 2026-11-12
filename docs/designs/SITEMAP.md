@@ -20,6 +20,7 @@ O **Gymnasion** é um ecossistema SaaS para Personal Trainers gerenciarem cartei
 | [Gestão de Rotinas](../rotinas.md) | Estrutura de semanas, exercícios e métricas | Implementado | 2026-10-16 |
 | [Redesign do Perfil do Aluno (Rotina Ativa e Sessões)](./student-profile-redesign.md) | Seletor de múltiplas rotinas ativas, simplificação de chips de métricas, filtro de semanas compacto e compactação da tabela na Visão Geral (`StudentProfile`, `ProfileRoutineCard`, `ProfileSessions`, `profileModel`) | Aprovado | 2026-11-03 |
 | [Suporte Full-Stack a Atleta Híbrido (Múltiplas Modalidades e Rotinas Ativas)](./hybrid-athlete.md) | Convite e perfil com 1 a 3 modalidades por aluno, bloqueio HTTP 422 ao remover modalidade com rotina/turma ativa, preservação de histórico, até 1 rotina ativa por modalidade e calendário semanal unificado por datas reais com filtro por modalidade | Implementado | 2026-11-11 |
+| [Vínculo de Métricas Personalizadas por Sessão de Treino e Duplicação de Planejamento](./session-metrics-and-duplication.md) | Transferência do vínculo de métricas (`0..N`) de `RotinaTreino` para `SessaoTreino`, migração Flyway `V22` preservando histórico, ações de duplicar sessão e duplicar semana (`N -> N+1` com auto-expansão) e resumo derivado Macro vs. Micro (`RoutineSessionPlanner`, `NewRoutine`, `Routines`, `ProfileRoutineCard`, `StudentProfile`, `RotinaTreinoService`, `MetricaService`) | Implementado | 2026-11-11 |
 
 ---
 

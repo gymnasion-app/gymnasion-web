@@ -2,6 +2,15 @@ import type { TipoMetrica } from "./metric";
 
 export type RoutineStatus = "ATIVA" | "ENCERRADA";
 
+export interface RoutineMetricSummary {
+  id: string;
+  titulo: string;
+  tipo: TipoMetrica;
+  obrigatoria?: boolean;
+  quemPreenche?: "ALUNO" | "PERSONAL" | "AMBOS";
+  campoStrava?: import("./strava").CampoStrava | null;
+}
+
 export interface RotinaResponse {
   id: string;
   titulo: string;
@@ -13,14 +22,7 @@ export interface RotinaResponse {
   status?: RoutineStatus;
   ativo?: boolean;
   alunos: { id: string; nome: string | null }[];
-  metricas: {
-    id: string;
-    titulo: string;
-    tipo: TipoMetrica;
-    obrigatoria?: boolean;
-    quemPreenche?: "ALUNO" | "PERSONAL" | "AMBOS";
-    campoStrava?: import("./strava").CampoStrava | null;
-  }[];
+  metricas: RoutineMetricSummary[];
 }
 
 export interface CriarRotinaPayload {
@@ -29,7 +31,6 @@ export interface CriarRotinaPayload {
   frequenciaSemanal: number;
   objetivos: string;
   alunosIds: string[];
-  metricasIds: string[];
 }
 
 export interface ReutilizarRotinaPayload {
@@ -50,6 +51,8 @@ export interface SessaoTreinoPlanejadaDTO {
   status: string;
   concluidaAluno?: boolean;
   validadaPersonal?: boolean;
+  metricasIds?: string[];
+  metricas?: RoutineMetricSummary[];
   desempenho?: {
     id: string;
     nivelCansaco: number | null;
@@ -86,5 +89,11 @@ export interface CriarSessaoTreinoPayload {
   dataPlanejada: string; // YYYY-MM-DD
   duracao?: number | null;
   atividades?: string | null;
+  metricasIds?: string[];
+}
+
+export interface DuplicarSessaoPayload {
+  semana: number;
+  dataPlanejada: string; // YYYY-MM-DD
 }
 

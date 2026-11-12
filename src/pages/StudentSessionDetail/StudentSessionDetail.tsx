@@ -16,6 +16,7 @@ import {
   Heart,
   FileText,
   Flame,
+  ArrowLeft,
 } from "lucide-react";
 import Button from "../../components/Button/Button";
 import Badge from "../../components/Badge/Badge";
@@ -76,7 +77,7 @@ export default function StudentSessionDetail() {
           rotinaInfo?.alunos?.[0]?.nome ||
           "Aluno";
 
-        const plannedMetrics = (rotinaInfo?.metricas || []).map((m) => ({
+        const plannedMetrics = (sessaoData.metricas || []).map((m) => ({
           metricaId: m.id,
           titulo: m.titulo,
           tipo: m.tipo,
@@ -247,6 +248,8 @@ export default function StudentSessionDetail() {
 
   // Busca feedback do personal registrado mais recente
   const personalFeedback = feedbacks.find((f) => f.papelAutor === "PERSONAL_TRAINER");
+  const studentProfilePath =
+    studentId || session.alunoId ? `/alunos/${studentId || session.alunoId}` : "/alunos";
 
   return (
     <div className="session-detail-page">
@@ -297,6 +300,14 @@ export default function StudentSessionDetail() {
         </div>
 
         <div className="session-detail__actions">
+          <Button
+            variant="secondary"
+            icon={<ArrowLeft size={16} />}
+            onClick={() => navigate(studentProfilePath)}
+          >
+            Voltar ao perfil do aluno
+          </Button>
+
           {session.concluidaAluno ? (
             <>
               {session.validadaPersonal && (
@@ -344,6 +355,11 @@ export default function StudentSessionDetail() {
             </header>
 
             <div className="session-detail__metrics-list">
+              {session.metricas.length === 0 && (
+                <p className="session-detail__empty-metrics">
+                  Sessão sem métricas customizadas (apenas RPE e duração).
+                </p>
+              )}
               {session.metricas.map((m) => {
                 const isPersonalPending =
                   m.inclusaoPermitida && !m.valor && (m.quemPreenche === "PERSONAL" || m.obrigatoria);

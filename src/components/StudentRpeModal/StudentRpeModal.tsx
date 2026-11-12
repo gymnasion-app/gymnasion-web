@@ -249,22 +249,11 @@ export default function StudentRpeModal({
     return null;
   }, [resolvedSessionId, studentCtx?.weeks]);
 
-  const targetRoutine = useMemo(() => {
-    if (!targetSession || !studentCtx?.activeRoutines?.length) {
-      return studentCtx?.activeRoutine || null;
-    }
-    return (
-      studentCtx.activeRoutines.find((r) => r.id === targetSession.rotinaTreinoId) ||
-      studentCtx.activeRoutine ||
-      null
-    );
-  }, [targetSession, studentCtx?.activeRoutines, studentCtx?.activeRoutine]);
-
   const [step, setStep] = useState<"metrics" | "rpe">("metrics");
   const [loadingForm, setLoadingForm] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [metrics, setMetrics] = useState<StudentExecutionMetricDTO[]>(
-    () => targetRoutine?.metricas || []
+    () => targetSession?.metricas || []
   );
 
   const todayIso = useMemo(() => localDateKey(new Date()), []);
@@ -307,7 +296,7 @@ export default function StudentRpeModal({
       .obterFormularioExecucao(resolvedSessionId)
       .then((form) => {
         if (!active) return;
-        if (Array.isArray(form.metricas) && form.metricas.length > 0) {
+        if (Array.isArray(form.metricas)) {
           setMetrics(form.metricas);
         }
         if (form.sessao?.duracao) {

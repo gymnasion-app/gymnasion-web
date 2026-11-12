@@ -19,10 +19,12 @@ import Avatar from "../../components/Avatar/Avatar";
 import Checkbox from "../../components/Checkbox/Checkbox";
 import { sessionDetailService } from "../../services/sessionDetailService";
 import { rotinaService } from "../../services/rotinaService";
+import { metricaService } from "../../services/metricaService";
 import { metricLabels } from "../../features/routines/routineModel";
 import { getPreenchimentoLabel } from "../../features/metrics/metricModel";
 import { authError } from "../../utils/authError";
 import { parseAtividades, serializeAtividades } from "../../utils/activityParser";
+import type { MetricaResponseDTO } from "../../types/metric";
 import type { TrainingSession } from "../../types/personalDashboard";
 import type { RotinaResponse } from "../../types/rotina";
 import type { Sport } from "../../components/SportTag/SportTag";
@@ -62,7 +64,8 @@ export default function StudentSessionEdit() {
   const [newTitle, setNewTitle] = useState("");
   const [newDesc, setNewDesc] = useState("");
 
-  // Métricas selecionadas
+  // Métricas da modalidade e selecionadas nesta sessão
+  const [modalityMetrics, setModalityMetrics] = useState<MetricaResponseDTO[]>([]);
   const [selectedMetrics, setSelectedMetrics] = useState<Record<string, boolean>>({});
 
   const loadData = useCallback(async () => {
@@ -70,8 +73,8 @@ export default function StudentSessionEdit() {
       const sessionData = await sessionDetailService.obterSessao(sessionId);
       setSession(sessionData);
 
-      if (sessionData.status === "CONCLUIDA" || sessionData.concluidaAluno) {
-        toast.error("Não é possível editar uma sessão já executada.");
+      if (sessionData.status !== "PLANEJADA" || sessionData.concluidaAluno) {
+        toast.error("Somente sessões planejadas futuras podem ser editadas.");
         navigate(`/alunos/${studentId}`);
         return;
       }
@@ -85,19 +88,32 @@ export default function StudentSessionEdit() {
       setSessionName(parsedAtividades.sessionName);
       setOrientations(parsedAtividades.orientations);
 
-      // Carrega rotina para obter métricas da modalidade
+      const sessionMetricIds = new Set(
+        sessionData.metricas && sessionData.metricas.length > 0
+          ? sessionData.metricas.map((m) => m.id)
+          : sessionData.metricasIds || []
+      );
+      const initialMetrics: Record<string, boolean> = {};
+      sessionMetricIds.forEach((id) => {
+        initialMetrics[id] = true;
+      });
+      setSelectedMetrics(initialMetrics);
+
+      // Carrega rotina e métricas ativas da modalidade
       if (sessionData.rotinaTreinoId) {
         try {
           const routineData = await rotinaService.buscarPorId(sessionData.rotinaTreinoId);
           setRoutine(routineData);
 
-          const initialMetrics: Record<string, boolean> = {};
-          (routineData.metricas || []).forEach((m: { id: string }) => {
-            initialMetrics[m.id] = true; // Por padrão, selecionadas
-          });
-          setSelectedMetrics(initialMetrics);
+          const modId = routineData.modalidadeId ?? routineData.modalidade?.id;
+          if (modId) {
+            const modMetrics = await metricaService.listarPorModalidade(modId);
+            setModalityMetrics((modMetrics || []).filter((m) => m.ativo));
+          } else {
+            setModalityMetrics([]);
+          }
         } catch {
-          // Rotina básica
+          setModalityMetrics([]);
         }
       }
     } catch (err) {
@@ -183,12 +199,16 @@ export default function StudentSessionEdit() {
       });
 
       const durMin = parseInt(duration.replace(/\D/g, ""), 10) || 40;
+      const metricasIds = modalityMetrics
+        .filter((m) => Boolean(selectedMetrics[m.id]))
+        .map((m) => m.id);
 
       await sessionDetailService.editarSessaoFutura(sessionId, {
         semana: session.semana,
         dataPlanejada: plannedDate,
         duracao: durMin,
         atividades: serialized,
+        metricasIds,
       });
 
       toast.success("Planejamento da sessão futura atualizado com sucesso!");
@@ -453,16 +473,20 @@ export default function StudentSessionEdit() {
             <header className="session-edit__card-header">
               <div>
                 <h2>Métricas desta sessão</h2>
-                <p>Da modalidade {routine?.nomeModalidade || routine?.modalidade?.nome || "Natação"} · marque as que serão registradas</p>
+                <p>
+                  Da modalidade {routine?.nomeModalidade || routine?.modalidade?.nome || "da rotina"}{" "}
+                  · marque de 0 a N métricas para o registro
+                </p>
               </div>
             </header>
 
             <div className="session-edit__metrics-checklist">
-              {routine?.metricas && routine.metricas.length > 0 ? (
-                routine.metricas.map((m) => (
+              {modalityMetrics.length > 0 ? (
+                modalityMetrics.map((m) => (
                   <div key={m.id} className="metric-check-item">
                     <Checkbox
                       label=""
+                      aria-label={`Incluir métrica ${m.titulo}`}
                       checked={Boolean(selectedMetrics[m.id])}
                       onChange={(e) =>
                         setSelectedMetrics((prev) => ({
@@ -485,7 +509,10 @@ export default function StudentSessionEdit() {
                 ))
               ) : (
                 <div className="no-metrics-msg">
-                  <p>Métricas padrão da modalidade ativas para esta sessão.</p>
+                  <p>
+                    Nenhuma métrica ativa cadastrada para esta modalidade. A sessão registrará
+                    apenas RPE e duração.
+                  </p>
                 </div>
               )}
             </div>

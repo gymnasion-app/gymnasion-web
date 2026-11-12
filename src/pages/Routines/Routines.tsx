@@ -29,7 +29,7 @@ type ActiveSubFilter = "all" | "assigned" | "unassigned";
 type SortOption = "alpha" | "students_desc" | "freq_desc";
 
 const MAX_VISIBLE_AVATARS = 4;
-const MAX_VISIBLE_METRICS = 2;
+const MAX_VISIBLE_METRICS = 3;
 
 const WORKSPACE_TABS: { id: RoutineWorkspaceTab; label: string }[] = [
   { id: "active", label: "Treinos em Andamento" },
@@ -565,24 +565,12 @@ export default function Routines() {
               <table className="routines-page__table routines-page__table--templates">
                 <thead>
                   <tr>
-                    <th scope="col" style={{ width: "32%" }}>
-                      MODELO DA CONSULTORIA
-                    </th>
-                    <th scope="col" style={{ width: "14%" }}>
-                      MODALIDADE
-                    </th>
-                    <th scope="col" style={{ width: "16%" }}>
-                      ESTRUTURA PADRÃO
-                    </th>
-                    <th scope="col" style={{ width: "16%" }}>
-                      MÉTRICAS PADRÃO
-                    </th>
-                    <th scope="col" style={{ width: "12%" }}>
-                      ADOÇÃO & CICLOS
-                    </th>
-                    <th scope="col" style={{ width: "10%", textAlign: "right" }}>
-                      AÇÕES
-                    </th>
+                    <th scope="col">MODELO DA CONSULTORIA</th>
+                    <th scope="col">MODALIDADE</th>
+                    <th scope="col">ESTRUTURA PADRÃO</th>
+                    <th scope="col">MÉTRICAS PADRÃO</th>
+                    <th scope="col">ADOÇÃO &amp; CICLOS</th>
+                    <th scope="col">AÇÕES</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -671,10 +659,10 @@ export default function Routines() {
                             className="routines-page__metrics-cell"
                             title={
                               metricsCount > 0
-                                ? `Métricas do modelo: ${metricsList
+                                ? `Métricas nas sessões: ${metricsList
                                     .map((m) => m.titulo)
                                     .join(", ")}`
-                                : "Nenhuma métrica vinculada"
+                                : "Apenas RPE e duração"
                             }
                           >
                             <div className="routines-page__metrics-summary">
@@ -692,7 +680,9 @@ export default function Routines() {
                                 <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
                               </svg>
                               <span>
-                                {metricsCount} {metricsCount === 1 ? "métrica" : "métricas"}
+                                {metricsCount > 0
+                                  ? `${metricsCount} ${metricsCount === 1 ? "métrica" : "métricas"}`
+                                  : "Apenas RPE e duração"}
                               </span>
                             </div>
                             {visibleMetrics.length > 0 && (
@@ -706,7 +696,13 @@ export default function Routines() {
                                   </span>
                                 ))}
                                 {extraMetricsCount > 0 && (
-                                  <span className="routines-page__metric-mini-tag routines-page__metric-mini-tag--more">
+                                  <span
+                                    className="routines-page__metric-mini-tag routines-page__metric-mini-tag--more"
+                                    title={metricsList
+                                      .slice(MAX_VISIBLE_METRICS)
+                                      .map((m) => m.titulo)
+                                      .join(", ")}
+                                  >
                                     +{extraMetricsCount}
                                   </span>
                                 )}
@@ -976,24 +972,12 @@ export default function Routines() {
               <table className="routines-page__table">
                 <thead>
                   <tr>
-                    <th scope="col" style={{ width: "32%" }}>
-                      ROTINA & ESCOPO
-                    </th>
-                    <th scope="col" style={{ width: "14%" }}>
-                      MODALIDADE
-                    </th>
-                    <th scope="col" style={{ width: "16%" }}>
-                      DIVISÃO & FREQUÊNCIA
-                    </th>
-                    <th scope="col" style={{ width: "16%" }}>
-                      MÉTRICAS
-                    </th>
-                    <th scope="col" style={{ width: "12%" }}>
-                      ALUNOS
-                    </th>
-                    <th scope="col" style={{ width: "10%", textAlign: "right" }}>
-                      AÇÕES
-                    </th>
+                    <th scope="col">ROTINA &amp; ESCOPO</th>
+                    <th scope="col">MODALIDADE</th>
+                    <th scope="col">DIVISÃO &amp; FREQUÊNCIA</th>
+                    <th scope="col">MÉTRICAS</th>
+                    <th scope="col">ALUNOS</th>
+                    <th scope="col">AÇÕES</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1097,10 +1081,10 @@ export default function Routines() {
                             className="routines-page__metrics-cell"
                             title={
                               metricsCount > 0
-                                ? `Métricas: ${metricsList
+                                ? `Métricas nas sessões: ${metricsList
                                     .map((m) => m.titulo)
                                     .join(", ")}`
-                                : "Nenhuma métrica vinculada"
+                                : "Apenas RPE e duração"
                             }
                           >
                             <div className="routines-page__metrics-summary">
@@ -1118,7 +1102,9 @@ export default function Routines() {
                                 <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
                               </svg>
                               <span>
-                                {metricsCount} {metricsCount === 1 ? "métrica" : "métricas"}
+                                {metricsCount > 0
+                                  ? `${metricsCount} ${metricsCount === 1 ? "métrica" : "métricas"}`
+                                  : "Apenas RPE e duração"}
                               </span>
                             </div>
                             {visibleMetrics.length > 0 && (
@@ -1132,7 +1118,13 @@ export default function Routines() {
                                   </span>
                                 ))}
                                 {extraMetricsCount > 0 && (
-                                  <span className="routines-page__metric-mini-tag routines-page__metric-mini-tag--more">
+                                  <span
+                                    className="routines-page__metric-mini-tag routines-page__metric-mini-tag--more"
+                                    title={metricsList
+                                      .slice(MAX_VISIBLE_METRICS)
+                                      .map((m) => m.titulo)
+                                      .join(", ")}
+                                  >
                                     +{extraMetricsCount}
                                   </span>
                                 )}

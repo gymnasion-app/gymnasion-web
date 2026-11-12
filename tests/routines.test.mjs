@@ -57,7 +57,7 @@ test("routineCounts computes all, active, and ended correctly", () => {
 
 test("visibleRoutines filters by status, search, and modality", () => {
   const list = [
-    makeRoutine("1", "Natação Velocidade", 1, 4, true, "ATIVA", [{ id: "s1", nome: "Mariana Silva" }]),
+    makeRoutine("1", "Natação Velocidade", 1, 4, true, "ATIVA", [{ id: "s1", nome: "Mariana Silva" }], [{ id: "m1", titulo: "Ritmo 100m" }]),
     makeRoutine("2", "Hipertrofia Força", 2, 5, true, "ATIVA", [{ id: "s2", nome: "Carlos Andrade" }]),
     makeRoutine("3", "Natação Resistência", 1, 3, false, "ENCERRADA", [{ id: "s3", nome: "Beatriz Costa" }]),
   ];
@@ -82,6 +82,12 @@ test("visibleRoutines filters by status, search, and modality", () => {
   assert.deepEqual(
     model.visibleRoutines(list, "all", "andrade").map((r) => r.id),
     ["2"]
+  );
+
+  // Filtro por busca no nome da métrica agregada das sessões
+  assert.deepEqual(
+    model.visibleRoutines(list, "all", "ritmo").map((r) => r.id),
+    ["1"]
   );
 
   // Filtro por modalidade
@@ -125,26 +131,25 @@ test("eligibleStudentsForRoutine enforces 1 active routine per student limit", (
   assert.deepEqual(eligibleForMod2.map((s) => s.id), ["s1", "s2"]);
 });
 
-test("validateCreateRoutinePayload enforces title, modality, frequency 1..7, goals, student, and metric", () => {
+test("validateCreateRoutinePayload enforces title, modality, frequency 1..7, goals, and student without requiring routine metrics", () => {
   assert.ok(model.validateCreateRoutinePayload({}).titulo);
   assert.ok(model.validateCreateRoutinePayload({}).modalidadeId);
   assert.ok(model.validateCreateRoutinePayload({}).frequenciaSemanal);
   assert.ok(model.validateCreateRoutinePayload({}).objetivos);
   assert.ok(model.validateCreateRoutinePayload({}).alunosIds);
-  assert.ok(model.validateCreateRoutinePayload({}).metricasIds);
+  assert.equal(model.validateCreateRoutinePayload({}).metricasIds, undefined);
 
   // Frequência inválida
   assert.ok(model.validateCreateRoutinePayload({ frequenciaSemanal: 0 }).frequenciaSemanal);
   assert.ok(model.validateCreateRoutinePayload({ frequenciaSemanal: 8 }).frequenciaSemanal);
 
-  // Payload válido
+  // Payload válido (sem metricasIds na criação da rotina)
   const valid = {
     titulo: "Treino A",
     modalidadeId: 1,
     frequenciaSemanal: 4,
     objetivos: "Resistência",
     alunosIds: ["s1"],
-    metricasIds: ["m1"],
   };
   assert.equal(Object.keys(model.validateCreateRoutinePayload(valid)).length, 0);
 });
@@ -217,7 +222,6 @@ test("rotinaService integration signatures and URLs match API routes", async () 
     frequenciaSemanal: 5,
     objetivos: "Novos objetivos",
     alunosIds: ["s1"],
-    metricasIds: ["m1"],
   });
   assert.equal(calledUrl, "/api/personal-trainers/rotinas/abc");
   assert.equal(calledMethod, "PUT");
@@ -242,11 +246,25 @@ test("rotinaService integration signatures and URLs match API routes", async () 
     dataPlanejada: "2026-11-10",
     duracao: 45,
     atividades: "Recuperação ativa\nAquecimento: 10 min",
+    metricasIds: ["m1"],
   });
   assert.equal(calledUrl, "/api/personal-trainers/rotinas/abc/sessoes");
   assert.equal(calledMethod, "POST");
   assert.equal(calledBody.semana, 1);
   assert.equal(calledBody.duracao, 45);
+  assert.deepEqual(calledBody.metricasIds, ["m1"]);
+
+  await rotinaService.duplicarSessao("sess-1", {
+    semana: 2,
+    dataPlanejada: "2026-11-17",
+  });
+  assert.equal(calledUrl, "/api/personal-trainers/rotinas/sessoes/sess-1/duplicar");
+  assert.equal(calledMethod, "POST");
+  assert.deepEqual(calledBody, { semana: 2, dataPlanejada: "2026-11-17" });
+
+  await rotinaService.duplicarSemana("abc", 1);
+  assert.equal(calledUrl, "/api/personal-trainers/rotinas/abc/semanas/1/duplicar");
+  assert.equal(calledMethod, "POST");
 });
 
 test("eligibleGroupsForRoutine and extractProblemDetail enforce modality match and RFC 7807 detail", () => {
@@ -424,22 +442,20 @@ test("buildRoutineTemplates consolidates duplicate and cycle routines into uniqu
   assert.equal(model.getRoutineScopeLabel(r2), "Turma / Coletivo · 3 alunos");
 });
 
-test("new routine draft cache starts without preselected fields and restores after metric creation", () => {
+test("new routine draft cache starts without preselected fields and roundtrips cleanly", () => {
   const initial = model.createInitialNewRoutineDraft();
   assert.equal(initial.titulo, "");
   assert.equal(initial.modalidadeId, null);
   assert.equal(initial.frequenciaSemanal, 0);
-  assert.equal(JSON.stringify(initial.selectedMetricIds), JSON.stringify([]));
   assert.equal(JSON.stringify(initial.selectedStudentIds), JSON.stringify([]));
+  assert.equal(initial.sendToTurma, false);
 
-  // Salva rascunho em cache antes de abrir o modal de criar métrica
   const serialized = model.serializeNewRoutineDraft({
     titulo: "Resistência 1500m",
     modalidadeId: 1,
     frequenciaSemanal: 3,
     objetivos: "Melhorar ritmo médio em águas abertas",
     selectedStudentIds: ["s1"],
-    selectedMetricIds: ["m1"],
     sendToTurma: false,
   });
 
@@ -447,24 +463,7 @@ test("new routine draft cache starts without preselected fields and restores aft
   assert.equal(restored.titulo, "Resistência 1500m");
   assert.equal(restored.modalidadeId, 1);
   assert.equal(restored.frequenciaSemanal, 3);
-  assert.equal(JSON.stringify(restored.selectedMetricIds), JSON.stringify(["m1"]));
-
-  // Quando o personal cadastra a nova métrica m2 na modalidade 1, ela já volta selecionada no rascunho
-  const merged = model.mergeCreatedMetricIntoDraft(restored, "m2", 1);
-  assert.equal(merged.titulo, "Resistência 1500m");
-  assert.equal(merged.modalidadeId, 1);
-  assert.equal(JSON.stringify(merged.selectedMetricIds), JSON.stringify(["m1", "m2"]));
-  assert.equal(JSON.stringify(merged.selectedStudentIds), JSON.stringify(["s1"]));
-
-  // URL de redirecionamento vai direto para o modal de criação vinculado à modalidade
-  assert.equal(
-    model.buildMetricCreateRedirectUrl(1, "/rotinas/nova"),
-    "/metricas?modalidadeId=1&acao=nova&retorno=%2Frotinas%2Fnova"
-  );
-  assert.equal(
-    model.buildMetricCreateRedirectUrl(null, "/rotinas/nova"),
-    "/metricas?acao=nova&retorno=%2Frotinas%2Fnova"
-  );
+  assert.equal(JSON.stringify(restored.selectedStudentIds), JSON.stringify(["s1"]));
 });
 
 test("filterAndSortRoutineMetrics, classifyStudentsForRoutine and multiple turmas selection work accurately", () => {
@@ -481,11 +480,19 @@ test("filterAndSortRoutineMetrics, classifyStudentsForRoutine and multiple turma
     JSON.stringify(["m2", "m3", "m1"])
   );
 
-  // Filtro de busca por texto insensível a acentos
+  // Filtro de busca por texto insensível a acentos, por tipo e por obrigatoriedade
   const filtered = model.filterAndSortRoutineMetrics(metrics, [], "distancia");
   assert.equal(
     JSON.stringify(filtered.map((m) => m.id)),
     JSON.stringify(["m3"])
+  );
+  assert.deepEqual(
+    model.filterAndSortRoutineMetrics(metrics, [], "opcional").map((m) => m.id),
+    ["m2"]
+  );
+  assert.deepEqual(
+    model.filterAndSortRoutineMetrics(metrics, [], "freq").map((m) => m.id),
+    ["m2"]
   );
 
   // IDs das métricas obrigatórias
