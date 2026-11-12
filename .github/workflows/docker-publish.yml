@@ -66,6 +66,7 @@ jobs:
           push: true
           build-args: |
             VITE_API_URL=/
+            VITE_RECAPTCHA_SITE_KEY=${{ vars.VITE_RECAPTCHA_SITE_KEY }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha

@@ -5,16 +5,29 @@
 .institutional-nav__links a { color: var(--color-text-secondary); font-size: 15px; font-weight: 500; }
 .institutional-nav__links a:hover { color: var(--color-primary-600); }
 .institutional-nav__actions { display: flex; gap: 10px; flex-shrink: 0; }
-.institutional-nav .institutional-nav__toggle { display: none; }
+.institutional-nav__compact { display: none; align-items: center; gap: 8px; margin-left: auto; }
 @media (max-width: 1150px) {
   .institutional-nav__inner { flex-wrap: wrap; gap: 16px; }
-  .institutional-nav .institutional-nav__toggle { display: inline-flex; }
+  .institutional-nav__compact { display: flex; }
+  .institutional-nav .institutional-nav__toggle { width: 44px; height: 44px; padding: 0; color: var(--color-text); }
+  .institutional-nav .institutional-nav__login { min-height: 44px; padding: 8px 18px; font-size: 15px; font-weight: 700; }
+  .institutional-nav .institutional-nav__menu-login { display: none; }
   .institutional-nav__menu { display: none; flex-basis: 100%; max-width: none; }
   .institutional-nav__menu--open { display: flex; }
   .institutional-nav__links { flex-wrap: wrap; gap: 20px; }
 }
 @media (max-width: 700px) {
+  .institutional-nav__inner { padding-block: 16px; gap: 12px; }
+  .institutional-nav .ds-logo { gap: 8px; font-size: 19px; }
+  .institutional-nav .ds-logo img { width: 32px; height: 32px; }
+  .institutional-nav .institutional-nav__login { padding-inline: 14px; font-size: 14px; }
   .institutional-nav__menu--open, .institutional-nav__links { flex-direction: column; align-items: stretch; }
   .institutional-nav__menu { padding-block: 8px; }
   .institutional-nav__actions { flex-wrap: wrap; }
+}
+@media (max-width: 360px) {
+  .institutional-nav .ds-logo { gap: 6px; font-size: 17px; }
+  .institutional-nav .ds-logo img { width: 28px; height: 28px; }
+  .institutional-nav .institutional-nav__login { padding-inline: 12px; }
+  .institutional-nav__compact { gap: 4px; }
 }

@@ -1,0 +1,279 @@
+.conheca { background: var(--color-background); }
+html:has(.conheca) { scroll-behavior: smooth; }
+.conheca section { scroll-margin-top: 88px; }
+.conheca h3 { color: var(--color-text); }
+
+/* Utilitários de cor e marcadores */
+.conheca .conheca-text--primary { color: var(--color-primary-500); }
+.conheca .conheca-text--success { color: var(--color-success); }
+.conheca .conheca-text--warning { color: var(--color-warning); }
+.conheca .conheca-text--info { color: var(--color-info); }
+.conheca .conheca-text--academia { color: var(--color-sport-academia); }
+.conheca .conheca-text--natacao { color: var(--color-sport-natacao); }
+.conheca .conheca-text--corrida { color: var(--color-sport-corrida); }
+.conheca .conheca-text--ciclismo { color: var(--color-sport-ciclismo); }
+.conheca .conheca-text--tenis { color: var(--color-sport-tenis); }
+.conheca .conheca-text--funcional { color: var(--color-sport-funcional); }
+.conheca-dot { display: inline-block; flex: none; width: 8px; height: 8px; border-radius: var(--radius-pill); background: var(--color-primary-500); }
+.conheca-dot--success { background: var(--color-success); }
+.conheca-pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border: 1px solid var(--color-primary-100); border-radius: var(--radius-pill); background: var(--color-primary-50); color: var(--color-primary-500); font-size: 12px; font-weight: 700; }
+.conheca-pill__dot { width: 8px; height: 8px; border-radius: var(--radius-pill); background: var(--color-primary-500); animation: conheca-pulse 2s ease-in-out infinite; }
+@keyframes conheca-pulse { 50% { opacity: .4; } }
+.conheca-tag { align-self: flex-start; padding: 4px 12px; border-radius: 8px; background: var(--color-primary-50); color: var(--color-primary-500); font-size: 12px; font-weight: 700; }
+.conheca-icon { display: grid; place-items: center; width: 48px; height: 48px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-surface); box-shadow: var(--shadow-sm); }
+.conheca-icon--brand { border: 0; box-shadow: none; background: var(--color-primary-50); color: var(--color-primary-500); }
+.conheca-icon--tinted { border: 0; box-shadow: none; background: color-mix(in srgb, currentColor 10%, transparent); }
+.conheca-card { padding: 28px; border: 1px solid var(--color-border); border-radius: var(--radius-modal); background: var(--color-background); }
+
+/* Header */
+.conheca-nav { position: sticky; top: 0; z-index: 40; border-bottom: 1px solid var(--color-border); background: rgb(255 255 255 / 95%); backdrop-filter: blur(12px); }
+.conheca-nav__inner { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 12px; }
+.conheca-nav__links { display: flex; gap: 32px; }
+.conheca-nav__links a { color: var(--color-text-secondary); font-size: 14px; font-weight: 600; }
+.conheca-nav__links a:hover { color: var(--color-primary-500); }
+.conheca-nav__actions { display: flex; gap: 8px; }
+.conheca-nav__actions .button { min-height: 44px; font-size: 14px; font-weight: 700; }
+
+/* Seções */
+.conheca-section { padding-block: 96px; border-bottom: 1px solid var(--color-border); }
+.conheca-section--white { background: var(--color-surface); }
+.conheca-heading { max-width: 768px; margin-bottom: 56px; }
+.conheca-heading h2 { color: var(--color-text); }
+.conheca-heading > p:last-child { color: var(--color-text-secondary); font-size: 16px; }
+.conheca-heading--left { display: flex; flex-direction: column; gap: 8px; }
+.conheca-heading--left h2 { font-size: 40px; font-weight: 800; line-height: 1.18; letter-spacing: -.02em; }
+.conheca-heading--left > p:last-child:not(.institutional-eyebrow) { margin-top: 8px; }
+
+/* Hero */
+.conheca-hero { padding-block: 64px 96px; border-bottom: 1px solid var(--color-border); background: linear-gradient(180deg, var(--color-surface), var(--color-primary-50)); }
+.conheca-hero__inner { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 48px; }
+.conheca-hero__copy { display: flex; flex-direction: column; align-items: flex-start; gap: 16px; min-width: 0; }
+.conheca-hero h1 em { color: var(--color-primary-500); font-style: normal; }
+.conheca-hero h1 { color: var(--color-text); font-size: 46px; font-weight: 800; line-height: 1.18; letter-spacing: -.03em; }
+.conheca-hero__description { max-width: 576px; color: var(--color-text-secondary); font-size: 16px; line-height: 1.65; }
+.conheca-hero__actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
+.conheca-hero__actions .button { min-height: 48px; padding: 12px 20px; font-weight: 700; }
+.conheca-hero__actions .button--primary { box-shadow: 0 4px 6px -1px rgb(15 23 42 / 10%); }
+.conheca-hero__audience { display: flex; align-items: center; gap: 8px; color: var(--color-text-muted); font-size: 12px; font-weight: 500; }
+.conheca-hero__audience svg { flex: none; color: var(--color-primary-500); }
+.conheca-hero__mock { overflow: hidden; padding: 0; background: var(--color-surface); box-shadow: var(--shadow-lg); }
+.conheca-hero__mock-bar { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--color-ink-900); color: var(--color-text-inverse); }
+.conheca-hero__mock-bar > span { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; }
+.conheca-hero__mock-bar small { padding: 2px 8px; border-radius: 4px; background: #1e293b; color: var(--color-ink-300); font-size: 10px; font-weight: 600; }
+.conheca-hero__mock-body { display: flex; flex-direction: column; gap: 16px; padding: 24px; }
+
+/* Mockups ilustrativos */
+.conheca-mock { display: flex; flex-direction: column; gap: 8px; min-width: 0; padding: 20px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-background); font-size: 12px; }
+.conheca-mock strong { color: var(--color-text); font-weight: 700; }
+.conheca-mock .ds-sport-tag, .conheca-mock .ds-badge { flex: none; padding: 2px 8px; font-size: 11px; }
+.conheca-mock__head, .conheca-mock__subhead, .conheca-mock__title { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.conheca-mock__head { padding-bottom: 10px; border-bottom: 1px solid var(--color-border); }
+.conheca-mock__head > span, .conheca-mock__subhead > span { color: var(--color-text-muted); font-size: 11px; }
+.conheca-mock__head--large strong { display: block; font-size: 14px; }
+.conheca-mock__head--large div span { color: var(--color-text-muted); font-size: 12px; }
+.conheca-mock__subhead { margin-bottom: 8px; }
+.conheca-mock__subhead span { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; }
+.conheca-mock__title div span { display: block; color: var(--color-text-muted); font-size: 11px; }
+.conheca-mock__action { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 8px; background: var(--color-primary-50); color: var(--color-primary-500); font-size: 11px; font-weight: 700; white-space: nowrap; }
+.conheca-mock__stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.conheca-mock__stats > div { padding: 10px; border: 1px solid var(--color-border); border-radius: var(--radius-control); background: var(--color-background); text-align: center; }
+.conheca-mock__stats span { display: block; color: var(--color-text-muted); font-size: 10px; font-weight: 500; }
+.conheca-mock__stats strong { font-size: 16px; font-weight: 800; }
+.conheca-mock__stats small { color: var(--color-text-muted); font-size: 10px; font-weight: 400; }
+.conheca-mock__row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-surface); }
+.conheca-mock__row + .conheca-mock__row { margin-top: 8px; }
+.conheca-mock__row--soft { background: var(--color-background); }
+.conheca-mock__row > div { min-width: 0; }
+.conheca-mock__row strong, .conheca-mock__row span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conheca-mock__row div > span { color: var(--color-text-muted); font-size: 11px; }
+.conheca-mock__panel { padding: 12px; border: 1px solid var(--color-border); border-radius: var(--radius-control); background: var(--color-background); }
+.conheca-mock__panel--white { display: flex; flex-direction: column; gap: 12px; padding: 16px; background: var(--color-surface); }
+.conheca-mock__list { display: flex; flex-direction: column; color: var(--color-text-secondary); }
+.conheca-mock__list > div { display: flex; justify-content: space-between; gap: 12px; padding-block: 5px; border-bottom: 1px solid var(--color-border); }
+.conheca-mock__list > div:last-child { border-bottom: 0; }
+.conheca-mock__list--dashed > div { border-bottom-style: dashed; }
+.conheca-mock__list dd { flex: none; color: var(--color-text-muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+.conheca-mock__list dd.conheca-text--primary { font-weight: 700; }
+.conheca-mock__panel .conheca-mock__title { margin-bottom: 8px; }
+.conheca-mock__panel--white .conheca-mock__title { margin-bottom: 0; padding-bottom: 10px; border-bottom: 1px solid var(--color-border); }
+.conheca-mock__foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; color: var(--color-text-muted); font-size: 11px; }
+.conheca-mock__ok { color: var(--color-success); font-weight: 700; }
+.conheca-mock__kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.conheca-mock__kpis > div { display: flex; flex-direction: column; padding: 12px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-background); }
+.conheca-mock__kpis span, .conheca-mock__kpis small { color: var(--color-text-muted); font-size: 10px; }
+.conheca-mock__kpis strong { font-size: 16px; font-weight: 800; }
+.conheca-mock__callout { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border: 1px solid var(--color-primary-100); border-radius: 8px; background: var(--color-primary-50); }
+.conheca-mock__callout > strong { color: var(--color-primary-500); font-size: 11px; }
+.conheca-mock__callout > span { padding: 2px 8px; border-radius: 4px; background: var(--color-surface); color: var(--color-text); font-size: 10px; font-weight: 700; white-space: nowrap; }
+.conheca-mock__callout--icon { justify-content: flex-start; }
+.conheca-mock__callout--icon strong { display: block; line-height: 1.3; }
+.conheca-mock__callout--icon div span { color: var(--color-text-muted); font-size: 10px; }
+.conheca-mock__callout-icon { display: grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: var(--radius-pill); background: var(--color-surface); color: var(--color-primary-500); }
+.conheca-bars { display: flex; align-items: flex-end; gap: 8px; height: 56px; padding-inline: 4px; }
+.conheca-bars > div { display: flex; flex: 1; flex-direction: column; justify-content: flex-end; align-items: center; gap: 2px; height: 100%; }
+.conheca-bars > div > span { width: 100%; max-height: calc(100% - 16px); border-radius: 4px 4px 0 0; background: var(--color-primary-100); }
+.conheca-bars .conheca-bars__current { background: var(--color-primary-500); }
+.conheca-bars small { color: var(--color-text-muted); font-size: 9px; }
+.conheca-bars > div:last-child small { color: var(--color-primary-500); font-weight: 700; }
+.conheca-progress > div { display: flex; justify-content: space-between; margin-bottom: 4px; color: var(--color-text-muted); font-size: 11px; }
+.conheca-progress__track { display: block; height: 8px; border-radius: var(--radius-pill); background: var(--color-border); }
+.conheca-progress__track span { display: block; height: 100%; border-radius: inherit; background: var(--color-primary-500); }
+.conheca-progress--success .conheca-progress__track span { background: var(--color-success); }
+
+/* Problema */
+.conheca-problems { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; }
+.conheca-problems__card { display: flex; flex-direction: column; justify-content: space-between; gap: 24px; transition: box-shadow 150ms ease; }
+.conheca-problems__card:hover { box-shadow: var(--shadow-sm); }
+.conheca-problems__card .conheca-icon { margin-bottom: 20px; }
+.conheca-problems__card h3 { margin-bottom: 10px; font-size: 18px; font-weight: 700; }
+.conheca-problems__card p { color: var(--color-text-muted); font-size: 14px; line-height: 1.65; }
+.conheca-problems__card .conheca-problems__solution { display: flex; align-items: center; gap: 6px; padding-top: 16px; border-top: 1px solid var(--color-border); color: var(--color-primary-500); font-size: 12px; font-weight: 700; }
+.conheca-problems__solution .conheca-dot { width: 6px; height: 6px; }
+
+/* Pilares */
+.conheca-pillars { display: flex; flex-direction: column; gap: 40px; }
+.conheca-pillar { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 32px; padding: 40px; border: 1px solid var(--color-border); border-radius: var(--radius-modal); background: var(--color-surface); box-shadow: var(--shadow-sm); }
+.conheca-pillar--reverse .conheca-pillar__copy { order: 2; }
+.conheca-pillar__copy { display: flex; flex-direction: column; gap: 16px; }
+.conheca-pillar__copy h3 { font-size: 24px; font-weight: 800; }
+.conheca-pillar__copy > p { color: var(--color-text-secondary); font-size: 16px; line-height: 1.65; }
+.conheca-checklist { display: flex; flex-direction: column; gap: 10px; padding-top: 8px; list-style: none; color: var(--color-text-secondary); font-size: 14px; }
+.conheca-checklist li { display: flex; align-items: center; gap: 10px; }
+.conheca-checklist svg { flex: none; color: var(--color-success); }
+
+/* Demonstração */
+.conheca-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; width: 100%; max-width: 448px; margin: -24px auto 32px; padding: 4px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-background); }
+.conheca-tabs__tab { min-height: 44px; padding: 8px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--color-text-muted); font: 700 14px/1.5 var(--font-family); cursor: pointer; transition: color 150ms ease, background 150ms ease; }
+.conheca-tabs__tab:hover { color: var(--color-text); }
+.conheca-tabs__tab--active, .conheca-tabs__tab--active:hover { border-color: var(--color-border); background: var(--color-surface); color: var(--color-primary-500); box-shadow: var(--shadow-sm); }
+.conheca-demo { display: grid; grid-template-columns: 5fr 7fr; align-items: center; gap: 32px; max-width: 896px; margin-inline: auto; padding: 32px; border: 1px solid var(--color-border); border-radius: var(--radius-modal); background: var(--color-background); box-shadow: var(--shadow-sm); }
+.conheca-demo__copy { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+.conheca-demo__label { color: var(--color-primary-500); font-size: 12px; font-weight: 700; }
+.conheca-demo__copy h3 { font-size: 20px; font-weight: 800; line-height: 1.3; }
+.conheca-demo__copy p { color: var(--color-text-muted); font-size: 14px; line-height: 1.65; }
+.conheca-demo__chip { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; padding: 6px 12px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-surface); color: var(--color-text); font-size: 12px; font-weight: 700; }
+.conheca-demo__chip svg { color: var(--color-primary-500); }
+.conheca-demo__note { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; color: var(--color-text-secondary); font-size: 12px; font-weight: 600; }
+.conheca-demo__note--info { color: var(--color-info); font-weight: 700; }
+.conheca-demo__mock { gap: 12px; background: var(--color-surface); }
+
+/* Modalidades */
+.conheca-sports { display: grid; grid-template-columns: repeat(6, 1fr); gap: 24px; }
+.conheca-sports__card { display: flex; flex-direction: column; align-items: center; padding: 20px; border: 1px solid var(--color-border); border-radius: var(--radius-card); background: var(--color-surface); text-align: center; transition: border-color 150ms ease; }
+.conheca-sports__card .conheca-icon { margin-bottom: 12px; transition: transform 150ms ease; }
+.conheca-sports__card:hover .conheca-icon { transform: scale(1.05); }
+.conheca-sports__card--academia:hover { border-color: var(--color-sport-academia); }
+.conheca-sports__card--natacao:hover { border-color: var(--color-sport-natacao); }
+.conheca-sports__card--corrida:hover { border-color: var(--color-sport-corrida); }
+.conheca-sports__card--ciclismo:hover { border-color: var(--color-sport-ciclismo); }
+.conheca-sports__card--tenis:hover { border-color: var(--color-sport-tenis); }
+.conheca-sports__card--funcional:hover { border-color: var(--color-sport-funcional); }
+.conheca-sports__card h3 { margin-bottom: 4px; font-size: 14px; font-weight: 700; }
+.conheca-sports__card p { color: var(--color-text-muted); font-size: 12px; line-height: 1.3; }
+
+/* Passos */
+.conheca-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; list-style: none; }
+.conheca-steps .conheca-card { padding: 24px; }
+.conheca-steps__number { display: grid; place-items: center; width: 40px; height: 40px; margin-bottom: 20px; border-radius: var(--radius-pill); background: var(--color-primary-500); color: var(--color-text-inverse); font-weight: 800; }
+.conheca-steps h3 { margin-bottom: 10px; font-size: 18px; font-weight: 700; }
+.conheca-steps p { color: var(--color-text-muted); font-size: 14px; line-height: 1.65; }
+
+/* FAQ */
+.conheca-faq { max-width: 896px; }
+.conheca-faq .conheca-heading { margin-bottom: 48px; }
+.conheca-faq__list { display: flex; flex-direction: column; gap: 14px; }
+.conheca-faq__item { overflow: hidden; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-surface); }
+.conheca-faq__item h3 { font-size: inherit; }
+.conheca-faq__item button { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; min-height: 48px; padding: 16px 20px; border: 0; background: transparent; color: var(--color-text); font: 700 16px/1.5 var(--font-family); text-align: left; cursor: pointer; transition: background 150ms ease; }
+.conheca-faq__item button:hover { background: var(--color-background); }
+.conheca-faq__item button:focus-visible { outline-offset: -2px; }
+.conheca-faq__item button svg { flex: none; color: var(--color-text-muted); transition: transform 200ms ease; }
+.conheca-faq__item button svg.conheca-faq__chevron--open { transform: rotate(180deg); }
+.conheca-faq__answer { margin-inline: 20px; padding-block: 12px 16px; border-top: 1px solid var(--color-border); color: var(--color-text-secondary); font-size: 14px; line-height: 1.65; }
+
+/* Contato */
+.conheca-contact__card { max-width: 576px; margin-inline: auto; padding: 32px; border: 1px solid var(--color-border); border-radius: var(--radius-modal); background: var(--color-background); box-shadow: var(--shadow-sm); }
+#contato .conheca-heading { margin-bottom: 40px; }
+#contato .conheca-pill { padding-block: 4px; }
+
+/* CTAs entre as seções */
+.conheca-section-cta { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 16px 24px; margin-top: 56px; text-align: center; }
+.conheca-section-cta p { max-width: 520px; color: var(--color-text-secondary); font-size: 16px; font-weight: 600; line-height: 1.5; }
+.conheca-cta-button { justify-content: center; text-align: center; gap: 8px; min-height: 48px; padding: 12px 22px; font-weight: 700; }
+.conheca-cta-button svg { flex: none; transition: transform 150ms ease; }
+.conheca-cta-button:hover svg { transform: translateX(3px); }
+
+/* Banner (mesmo gradiente da seção de assinatura da Home) */
+.conheca-banner-section { padding-block: 96px 0; background: var(--color-surface); }
+.conheca-banner { display: flex; align-items: center; justify-content: space-between; gap: 32px; padding: 56px; border-radius: 32px; background: linear-gradient(90deg, #ff8a3d, #e5391b); color: var(--color-text-inverse); }
+.conheca-banner__copy { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; max-width: 640px; }
+.conheca-banner__label { padding: 6px 12px; border-radius: var(--radius-pill); background: rgb(255 255 255 / 20%); font-size: 13px; font-weight: 700; }
+.conheca-banner h2 { font-size: 36px; font-weight: 800; line-height: 1.2; letter-spacing: -.02em; }
+.conheca-banner__copy > p:last-child { color: rgb(255 255 255 / 90%); font-size: 16px; line-height: 1.6; }
+.conheca-banner .conheca-cta-button { flex: none; border: 0; }
+
+/* Rodapé */
+.conheca-footer { padding-block: 56px 48px; background: var(--color-ink-900); color: var(--color-text-inverse); }
+.conheca-footer__top { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; padding-bottom: 48px; border-bottom: 1px solid #1e293b; }
+.conheca-footer__brand { display: flex; flex-direction: column; gap: 16px; }
+.conheca-footer__brand p { max-width: 384px; color: var(--color-ink-400); font-size: 14px; line-height: 1.65; }
+.conheca-footer__links { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+.conheca-footer__links div { display: flex; flex-direction: column; gap: 8px; }
+.conheca-footer__links h2 { margin-bottom: 4px; font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+.conheca-footer__links a { color: var(--color-ink-400); font-size: 14px; transition: color 150ms ease; }
+.conheca-footer__links a:hover { color: var(--color-text-inverse); }
+.conheca-footer__bottom { display: flex; justify-content: space-between; gap: 16px; padding-top: 32px; color: var(--color-ink-500); font-size: 12px; }
+
+/* CTA fixo no mobile */
+.conheca-sticky-cta { display: none; }
+
+@media (max-width: 1024px) {
+  .conheca-hero__inner, .conheca-pillar { grid-template-columns: 1fr; }
+  .conheca-hero__mock { width: 100%; max-width: 512px; margin-inline: auto; }
+  .conheca-pillar--reverse .conheca-pillar__copy { order: 0; }
+  .conheca-sports { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (max-width: 768px) {
+  .conheca-nav__links, .conheca-nav__login { display: none; }
+  .conheca-section { padding-block: 64px; }
+  .conheca-hero { padding-block: 32px 56px; }
+  .conheca-hero h1 { font-size: 34px; }
+  .conheca-heading { margin-bottom: 32px; }
+  .conheca-heading--left h2 { font-size: 30px; }
+  .conheca-problems, .conheca-steps { grid-template-columns: 1fr; gap: 16px; }
+  .conheca-demo { grid-template-columns: 1fr; padding: 24px; }
+  .conheca-tabs { margin-top: -8px; }
+  .conheca-footer__top { grid-template-columns: 1fr; }
+  .conheca-section-cta { margin-top: 40px; }
+  .conheca-banner-section { padding-top: 64px; }
+  .conheca-banner { flex-direction: column; align-items: flex-start; padding: 36px; }
+  .conheca-banner h2 { font-size: 30px; }
+  .conheca-footer__bottom { flex-direction: column; align-items: center; text-align: center; }
+  .conheca-footer { padding-bottom: 96px; }
+  .conheca-sticky-cta { position: fixed; inset: auto 0 0; z-index: 30; display: block; padding: 12px; border-top: 1px solid var(--color-border); background: rgb(255 255 255 / 95%); backdrop-filter: blur(12px); box-shadow: var(--shadow-lg); transform: translateY(100%); transition: transform 300ms ease; }
+  .conheca-sticky-cta--visible { transform: translateY(0); }
+  .conheca-sticky-cta .button { width: 100%; min-height: 48px; font-size: 14px; font-weight: 700; }
+}
+
+@media (max-width: 600px) {
+  .conheca-hero h1 { font-size: 28px; }
+  .conheca-hero__description { font-size: 14px; }
+  .conheca-hero__actions { flex-direction: column; align-self: stretch; }
+  .conheca-hero__mock-body { padding: 16px; }
+  .conheca-heading--left h2 { font-size: 26px; }
+  .conheca-card, .conheca-pillar, .conheca-contact__card { padding: 20px; }
+  .conheca-sports { grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  .conheca-mock__kpis { grid-template-columns: 1fr; }
+  .conheca-faq__item button { font-size: 14px; }
+  .conheca-nav__actions .button { padding-inline: 14px; font-size: 13px; }
+  .conheca-section-cta .conheca-cta-button, .conheca-banner .conheca-cta-button { width: 100%; padding-inline: 16px; font-size: 15px; }
+  .conheca-banner { padding: 28px; }
+  .conheca-banner h2 { font-size: 26px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .conheca-pill__dot { animation: none; }
+  .conheca-sticky-cta, .conheca-faq__item button svg, .conheca-sports__card .conheca-icon, .conheca-cta-button svg { transition: none; }
+  html:has(.conheca) { scroll-behavior: auto; }
+}
