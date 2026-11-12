@@ -4,6 +4,7 @@ import WorkspaceDialog from "../WorkspaceDialog/WorkspaceDialog";
 import Badge from "../Badge/Badge";
 import Button from "../Button/Button";
 import { stravaService } from "../../services/stravaService";
+import { connectStravaWithPopup, STRAVA_STATUS_CHANGED } from "../../features/strava/connectWithPopup";
 import { authError } from "../../utils/authError";
 import type { StravaAtividade, StravaStatusResponse } from "../../types/strava";
 import "./StravaModal.css";
@@ -63,22 +64,22 @@ export default function StravaModal({ onClose, onStatusChanged }: StravaModalPro
     }
 
     void fetchStatus();
+    window.addEventListener(STRAVA_STATUS_CHANGED, fetchStatus);
     return () => {
       active = false;
+      window.removeEventListener(STRAVA_STATUS_CHANGED, fetchStatus);
     };
   }, [onStatusChanged]);
 
   async function handleConnect() {
     try {
       setConnecting(true);
-      const res = await stravaService.obterAuthUrl();
-      if (res.authUrl) {
-        window.location.href = res.authUrl;
-      }
+      await connectStravaWithPopup();
+      toast.success("Conta Strava conectada com sucesso.");
     } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível conectar ao Strava.");
+    } finally {
       setConnecting(false);
-      const parsed = authError(err, "Não foi possível iniciar a conexão com o Strava.");
-      toast.error(parsed.message);
     }
   }
 
@@ -331,7 +332,7 @@ export default function StravaModal({ onClose, onStatusChanged }: StravaModalPro
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="#ffffff" aria-hidden="true">
                   <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7.008 13.828h4.172" />
                 </svg>
-                <span>{connecting ? "Redirecionando..." : "Conectar com o Strava"}</span>
+                <span>{connecting ? "Aguardando autorização..." : "Conectar com o Strava"}</span>
               </button>
             </div>
           </div>

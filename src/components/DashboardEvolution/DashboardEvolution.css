@@ -1,5 +1,7 @@
 .dashboard-evolution { position: relative; }
 .dashboard-evolution > header { padding-right: 170px; }
+.dashboard-panel.dashboard-evolution > header p,
+.dashboard-evolution .dashboard-v2__chart p { color: var(--color-text-muted); }
 .dashboard-evolution__controls { position: absolute; right: 20px; top: 20px; display: flex; gap: 4px; background: var(--color-background); padding: 4px; border-radius: 8px; }
 .dashboard-evolution__controls button { border: 0; background: transparent; color: var(--color-text-muted); font-size: 11px; padding: 6px 8px; border-radius: 6px; cursor: pointer; }
 .dashboard-evolution__controls button[aria-pressed=true] { background: var(--color-surface); color: var(--color-text); box-shadow: var(--shadow-sm); }

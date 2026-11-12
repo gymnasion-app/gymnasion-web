@@ -10,6 +10,7 @@ import StudentSmoothChart from "../../components/StudentSmoothChart/StudentSmoot
 import { useStudentArea } from "../../features/studentArea/StudentContext";
 import { sportKeyFromName } from "../../features/studentArea/studentAreaModel";
 import { stravaService } from "../../services/stravaService";
+import { STRAVA_STATUS_CHANGED } from "../../features/strava/connectWithPopup";
 import type { StravaStatusResponse } from "../../types/strava";
 import type { StudentExecutionMetricDTO } from "../../types/studentArea";
 import { parseAtividades } from "../../utils/activityParser";
@@ -68,10 +69,12 @@ export default function AccountHome() {
   const [stravaStatus, setStravaStatus] = useState<StravaStatusResponse | null>(null);
 
   useEffect(() => {
-    stravaService
-      .obterStatus()
-      .then(setStravaStatus)
-      .catch(() => {});
+    function refreshStravaStatus() {
+      void stravaService.obterStatus().then(setStravaStatus).catch(() => {});
+    }
+    refreshStravaStatus();
+    window.addEventListener(STRAVA_STATUS_CHANGED, refreshStravaStatus);
+    return () => window.removeEventListener(STRAVA_STATUS_CHANGED, refreshStravaStatus);
   }, []);
 
   useEffect(() => {
