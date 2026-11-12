@@ -74,7 +74,7 @@ export default function GroupDetails() {
         <div>
           <span className="group-details__routine-label">{linkedRoutine ? "Rotina vinculada à turma" : "Rotina de treino da turma"}</span>
           <h2>{linkedRoutine ? linkedRoutine.titulo : "Nenhuma rotina ativa vinculada"}</h2>
-          <p>{linkedRoutine ? `${linkedRoutine.nomeModalidade || group.nomeModalidade} · ${linkedRoutine.frequenciaSemanal}x por semana · ${linkedRoutine.metricas?.length || 0} ${(linkedRoutine.metricas?.length || 0) === 1 ? "métrica" : "métricas"}${linkedRoutine.objetivos ? ` — ${linkedRoutine.objetivos}` : ""}` : `Vincule uma rotina ativa de ${group.nomeModalidade} para enviar o treino em lote aos alunos desta turma.`}</p>
+          <p>{linkedRoutine ? `${linkedRoutine.nomeModalidade || group.nomeModalidade} · ${linkedRoutine.frequenciaSemanal}x por semana · ${linkedRoutine.metricas?.length ? `${linkedRoutine.metricas.length} ${linkedRoutine.metricas.length === 1 ? "métrica" : "métricas"}` : "Apenas RPE e duração"}${linkedRoutine.objetivos ? ` — ${linkedRoutine.objetivos}` : ""}` : `Vincule uma rotina ativa de ${group.nomeModalidade} para enviar o treino em lote aos alunos desta turma.`}</p>
         </div>
       </div>
       <Button variant={linkedRoutine ? "secondary" : "primary"} disabled={busy || saving} onClick={() => setLinkingRoutine(true)} icon={<img src="/groups/imgIconDumbbell1.svg" alt="" />}>Vincular rotina</Button>

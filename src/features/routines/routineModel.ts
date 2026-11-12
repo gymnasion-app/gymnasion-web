@@ -71,13 +71,16 @@ export function visibleRoutines(
         if (itemModId !== modId) return false;
       }
 
-      // Filtro de busca (título da rotina, objetivos ou nomes dos alunos vinculados)
+      // Filtro de busca (título da rotina, objetivos, alunos, modalidade ou métricas)
       if (query) {
         const titleMatch = normalize(routine.titulo).includes(query);
         const goalMatch = routine.objetivos ? normalize(routine.objetivos).includes(query) : false;
         const studentMatch = routine.alunos.some((aluno) => aluno.nome && normalize(aluno.nome).includes(query));
         const modalityMatch = normalize(routine.nomeModalidade || routine.modalidade?.nome || "").includes(query);
-        if (!titleMatch && !goalMatch && !studentMatch && !modalityMatch) return false;
+        const metricMatch = (routine.metricas || []).some(
+          (m) => m.titulo && normalize(m.titulo).includes(query)
+        );
+        if (!titleMatch && !goalMatch && !studentMatch && !modalityMatch && !metricMatch) return false;
       }
 
       return true;
@@ -190,10 +193,6 @@ export function validateCreateRoutinePayload(payload: Partial<CriarRotinaPayload
 
   if (!payload.alunosIds || payload.alunosIds.length === 0) {
     errors.alunosIds = "É necessário selecionar ao menos um aluno.";
-  }
-
-  if (!payload.metricasIds || payload.metricasIds.length === 0) {
-    errors.metricasIds = "Selecione ao menos 1 métrica para a rotina.";
   }
 
   return errors;
@@ -464,7 +463,6 @@ export interface NewRoutineDraft {
   frequenciaSemanal: number;
   objetivos: string;
   selectedStudentIds: string[];
-  selectedMetricIds: string[];
   sendToTurma: boolean;
   selectedTurmaIds: string[];
   updatedAt: number;
@@ -477,7 +475,6 @@ export function createInitialNewRoutineDraft(): NewRoutineDraft {
     frequenciaSemanal: 0,
     objetivos: "",
     selectedStudentIds: [],
-    selectedMetricIds: [],
     sendToTurma: false,
     selectedTurmaIds: [],
     updatedAt: 0,
@@ -510,15 +507,6 @@ export function serializeNewRoutineDraft(draft: Partial<NewRoutineDraft>): strin
     selectedStudentIds: Array.isArray(draft.selectedStudentIds)
       ? draft.selectedStudentIds.filter((id): id is string => typeof id === "string" && Boolean(id))
       : [],
-    selectedMetricIds: Array.isArray(draft.selectedMetricIds)
-      ? Array.from(
-          new Set(
-            draft.selectedMetricIds.filter(
-              (id): id is string => typeof id === "string" && Boolean(id)
-            )
-          )
-        )
-      : [],
     sendToTurma: Boolean(draft.sendToTurma || selectedTurmaIds.length > 0),
     selectedTurmaIds,
     updatedAt: typeof draft.updatedAt === "number" ? draft.updatedAt : Date.now(),
@@ -537,53 +525,6 @@ export function parseNewRoutineDraft(raw: string | null | undefined): NewRoutine
   }
 }
 
-export function mergeCreatedMetricIntoDraft(
-  draft: NewRoutineDraft | null,
-  metricId: string,
-  modalidadeId?: number | null
-): NewRoutineDraft {
-  const base = draft ? { ...draft } : createInitialNewRoutineDraft();
-  const resolvedModalityId =
-    typeof modalidadeId === "number" && Number.isFinite(modalidadeId)
-      ? modalidadeId
-      : base.modalidadeId;
-
-  const sameModality =
-    base.modalidadeId === null ||
-    resolvedModalityId === null ||
-    base.modalidadeId === resolvedModalityId;
-
-  const baseMetrics = sameModality ? base.selectedMetricIds : [];
-  const nextMetrics = metricId
-    ? Array.from(new Set([...baseMetrics, String(metricId)]))
-    : baseMetrics;
-
-  return {
-    ...base,
-    modalidadeId: resolvedModalityId,
-    selectedStudentIds: sameModality ? base.selectedStudentIds : [],
-    sendToTurma: sameModality ? base.sendToTurma : false,
-    selectedTurmaIds: sameModality ? base.selectedTurmaIds : [],
-    selectedMetricIds: nextMetrics,
-    updatedAt: Date.now(),
-  };
-}
-
-export function buildMetricCreateRedirectUrl(
-  modalidadeId: number | null,
-  returnPath = "/rotinas/nova"
-): string {
-  const parts: string[] = [];
-  if (typeof modalidadeId === "number" && Number.isFinite(modalidadeId) && modalidadeId > 0) {
-    parts.push(`modalidadeId=${encodeURIComponent(String(modalidadeId))}`);
-  }
-  parts.push("acao=nova");
-  if (returnPath) {
-    parts.push(`retorno=${encodeURIComponent(returnPath)}`);
-  }
-  return `/metricas?${parts.join("&")}`;
-}
-
 export function filterAndSortRoutineMetrics(
   metrics: MetricaResponseDTO[],
   selectedIds: Iterable<string>,
@@ -600,7 +541,7 @@ export function filterAndSortRoutineMetrics(
       const typeMatch = normalize(typeLabel).includes(query);
       const reqLabel = m.obrigatoria !== false ? "obrigatoria" : "opcional";
       const reqMatch = reqLabel.includes(query);
-      return titleMatch && true || typeMatch || reqMatch;
+      return titleMatch || typeMatch || reqMatch;
     })
     .sort((a, b) => {
       const aSelected = selectedSet.has(a.id) ? 1 : 0;

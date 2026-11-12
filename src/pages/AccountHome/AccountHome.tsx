@@ -5,11 +5,14 @@ import Avatar from "../../components/Avatar/Avatar";
 import Badge from "../../components/Badge/Badge";
 import Button from "../../components/Button/Button";
 import SportTag from "../../components/SportTag/SportTag";
+import StudentModalityTabs from "../../components/StudentModalityTabs/StudentModalityTabs";
 import StudentSmoothChart from "../../components/StudentSmoothChart/StudentSmoothChart";
 import { useStudentArea } from "../../features/studentArea/StudentContext";
+import { sportKeyFromName } from "../../features/studentArea/studentAreaModel";
 import { stravaService } from "../../services/stravaService";
 import { STRAVA_STATUS_CHANGED } from "../../features/strava/connectWithPopup";
 import type { StravaStatusResponse } from "../../types/strava";
+import type { StudentExecutionMetricDTO } from "../../types/studentArea";
 import { parseAtividades } from "../../utils/activityParser";
 import "./AccountHome.css";
 
@@ -39,6 +42,9 @@ export default function AccountHome() {
   const {
     student,
     activeRoutine,
+    activeRoutines,
+    selectedModalityFilter,
+    setSelectedModalityFilter,
     weeks,
     weekDays,
     feedbacks,
@@ -48,6 +54,17 @@ export default function AccountHome() {
     setSelectedWeekNum,
     setStravaModalOpen,
   } = useStudentArea();
+
+  const isHybrid = activeRoutines.length > 1;
+  const isAllMode = isHybrid && selectedModalityFilter === "ALL";
+  const displayedRoutines = useMemo(
+    () => (isAllMode ? activeRoutines : activeRoutine ? [activeRoutine] : []),
+    [isAllMode, activeRoutines, activeRoutine]
+  );
+  const totalWeeklyFreq = displayedRoutines.reduce(
+    (sum, r) => sum + (r.frequenciaSemanal || 0),
+    0
+  );
 
   const [stravaStatus, setStravaStatus] = useState<StravaStatusResponse | null>(null);
 
@@ -77,6 +94,18 @@ export default function AccountHome() {
       .flatMap((w) => w.sessoes)
       .find((s) => s.status === "PLANEJADA");
 
+  const nextSessionWeekNum = nextSession
+    ? weeks.find((w) => w.sessoes.some((s) => s.id === nextSession.id))?.numero ??
+      nextSession.semana
+    : 1;
+  const nextSessionRoutine = nextSession
+    ? activeRoutines.find((r) => r.id === nextSession.rotinaTreinoId) || activeRoutine
+    : activeRoutine;
+  const nextSessionModality =
+    nextSession?.modalidadeNome || nextSessionRoutine?.modalidade || "Treino";
+  const nextSessionRoutineTitle =
+    nextSession?.rotinaTitulo || nextSessionRoutine?.titulo || "";
+
   const nextSessionParsed = useMemo(
     () => (nextSession ? parseAtividades(nextSession.descricao) : null),
     [nextSession]
@@ -88,10 +117,36 @@ export default function AccountHome() {
     : 0;
   const totalDaysInWeek = currentWeek ? currentWeek.sessoes.length : 0;
 
-  const studentMetrics = useMemo(
-    () => (activeRoutine?.metricas || []).filter((m) => m.quemPreenche !== "PERSONAL"),
-    [activeRoutine]
+  const displayedRoutineIds = useMemo(
+    () => new Set(displayedRoutines.map((r) => r.id)),
+    [displayedRoutines]
   );
+
+  const studentMetrics = useMemo(() => {
+    const map = new Map<string, StudentExecutionMetricDTO>();
+    for (const w of weeks) {
+      for (const s of w.sessoes) {
+        if (s.rotinaTreinoId && displayedRoutineIds.size > 0 && !displayedRoutineIds.has(s.rotinaTreinoId)) {
+          continue;
+        }
+        for (const m of s.metricas || []) {
+          if (m.quemPreenche !== "PERSONAL" && !map.has(m.id)) {
+            map.set(m.id, m);
+          }
+        }
+      }
+    }
+    if (map.size === 0) {
+      for (const r of displayedRoutines) {
+        for (const m of r.metricas || []) {
+          if (m.quemPreenche !== "PERSONAL" && !map.has(m.id)) {
+            map.set(m.id, m);
+          }
+        }
+      }
+    }
+    return [...map.values()];
+  }, [weeks, displayedRoutines, displayedRoutineIds]);
 
   // Calcula dados reais para o card "Minha evolução" a partir das sessões finalizadas
   const evolutionSummary = useMemo(() => {
@@ -195,22 +250,16 @@ export default function AccountHome() {
     };
   }, [weeks, studentMetrics, averageRpe, activeRoutine]);
 
-  const sportKey: "natacao" | "tenis" | "academia" | "corrida" | "ciclismo" | "funcional" =
-    activeRoutine?.modalidade?.toLowerCase().includes("tenis")
-      ? "tenis"
-      : activeRoutine?.modalidade?.toLowerCase().includes("corr")
-      ? "corrida"
-      : activeRoutine?.modalidade?.toLowerCase().includes("acad") ||
-        activeRoutine?.modalidade?.toLowerCase().includes("musc")
-      ? "academia"
-      : activeRoutine?.modalidade?.toLowerCase().includes("cicl")
-      ? "ciclismo"
-      : activeRoutine?.modalidade?.toLowerCase().includes("func")
-      ? "funcional"
-      : "natacao";
+  const sportKey = sportKeyFromName(nextSessionModality);
 
   return (
     <div className="student-panel">
+      <StudentModalityTabs
+        activeRoutines={activeRoutines}
+        selectedFilter={selectedModalityFilter}
+        onSelect={setSelectedModalityFilter}
+      />
+
       {/* Row 1: 4 KPI Cards */}
       <section className="student-panel__stats" aria-label="Indicadores do aluno">
         <article className="student-panel__stat-card">
@@ -218,7 +267,9 @@ export default function AccountHome() {
             <span className="student-panel__stat-icon student-panel__stat-icon--orange">
               <img src="/student-profile/imgIconActivity2.svg" alt="" />
             </span>
-            <Badge tone="success">Rotina atual</Badge>
+            <Badge tone="success">
+              {isAllMode ? `${activeRoutines.length} rotinas` : "Rotina atual"}
+            </Badge>
           </div>
           <strong className="student-panel__stat-value">{monthlySessionsCount}</strong>
           <span className="student-panel__stat-label">Sessões finalizadas</span>
@@ -232,9 +283,11 @@ export default function AccountHome() {
             <Badge tone="warning">Meta</Badge>
           </div>
           <strong className="student-panel__stat-value">
-            {activeRoutine ? `${activeRoutine.frequenciaSemanal}x` : "—"}
+            {displayedRoutines.length > 0 ? `${totalWeeklyFreq}x` : "—"}
           </strong>
-          <span className="student-panel__stat-label">Frequência semanal</span>
+          <span className="student-panel__stat-label">
+            {isAllMode ? "Total semanal combinado" : "Frequência semanal"}
+          </span>
         </article>
 
         <article className="student-panel__stat-card">
@@ -268,12 +321,20 @@ export default function AccountHome() {
                 <rect x="3" y="14" width="7" height="7" rx="1" />
               </svg>
             </span>
-            <Badge tone="info">{activeRoutine ? activeRoutine.modalidade : "Geral"}</Badge>
+            <Badge tone="info">
+              {isAllMode ? "Todas" : activeRoutine ? activeRoutine.modalidade : "Geral"}
+            </Badge>
           </div>
           <strong className="student-panel__stat-value">
-            {activeRoutine ? `${activeRoutine.semanaAtual}/${activeRoutine.totalSemanas}` : "—"}
+            {isAllMode && weeks.length > 0
+              ? `${currentWeek?.numero ?? 1}/${weeks.length}`
+              : activeRoutine
+              ? `${activeRoutine.semanaAtual}/${activeRoutine.totalSemanas}`
+              : "—"}
           </strong>
-          <span className="student-panel__stat-label">Semana da rotina ativa</span>
+          <span className="student-panel__stat-label">
+            {isAllMode ? "Semana no calendário" : "Semana da rotina ativa"}
+          </span>
         </article>
       </section>
 
@@ -296,10 +357,12 @@ export default function AccountHome() {
                 </span>
                 <div className="student-panel__next-title-row">
                   <h2>{nextSession.titulo}</h2>
-                  {activeRoutine && <SportTag sport={sportKey} />}
+                  {(nextSessionRoutine || nextSession.modalidadeNome) && (
+                    <SportTag sport={sportKey} />
+                  )}
                 </div>
                 <p className="student-panel__next-subtitle">
-                  {activeRoutine ? `${activeRoutine.titulo} · ` : ""}
+                  {nextSessionRoutineTitle ? `${nextSessionRoutineTitle} · ` : ""}
                   Planejado por {student.personal.name}
                 </p>
 
@@ -334,9 +397,9 @@ export default function AccountHome() {
                   <Button
                     variant="secondary"
                     onClick={() => {
-                      setSelectedWeekNum(nextSession.semana);
+                      setSelectedWeekNum(nextSessionWeekNum);
                       navigate(
-                        `/conta/treinos?semana=${nextSession.semana}&sessao=${encodeURIComponent(
+                        `/conta/treinos?semana=${nextSessionWeekNum}&sessao=${encodeURIComponent(
                           nextSession.id
                         )}`
                       );
@@ -438,7 +501,13 @@ export default function AccountHome() {
           <div className="student-panel__week-legend-row">
             <div className="student-panel__week-legend">
               <span className="student-panel__week-dot" aria-hidden="true" />
-              <span>{activeRoutine ? activeRoutine.modalidade : "Planejada"}</span>
+              <span>
+                {isAllMode
+                  ? `Planejada (${activeRoutines.length} rotinas)`
+                  : activeRoutine
+                  ? activeRoutine.modalidade
+                  : "Planejada"}
+              </span>
             </div>
             <div className="student-panel__week-legend">
               <span className="student-panel__week-dot student-panel__week-dot--muted" aria-hidden="true" />

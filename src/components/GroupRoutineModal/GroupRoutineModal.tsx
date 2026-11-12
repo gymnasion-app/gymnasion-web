@@ -124,6 +124,10 @@ export default function GroupRoutineModal({
               const linkedGroupStudentsCount = (routine.alunos || []).filter((s) => memberIds.has(s.id)).length;
               const metricsCount = routine.metricas?.length || 0;
               const linkedCount = routine.alunos?.length || 0;
+              const metricsSummary =
+                metricsCount > 0
+                  ? `${metricsCount} ${metricsCount === 1 ? "métrica" : "métricas"}`
+                  : "Apenas RPE e duração";
 
               return (
                 <label
@@ -159,8 +163,7 @@ export default function GroupRoutineModal({
                     </strong>
                     <span>
                       {routine.nomeModalidade || group.nomeModalidade} ·{" "}
-                      {routine.frequenciaSemanal}x / semana · {metricsCount}{" "}
-                      {metricsCount === 1 ? "métrica" : "métricas"} · {linkedCount}{" "}
+                      {routine.frequenciaSemanal}x / semana · {metricsSummary} · {linkedCount}{" "}
                       {linkedCount === 1 ? "aluno vinculado" : "alunos vinculados"}
                     </span>
                   </div>

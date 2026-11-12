@@ -7,7 +7,7 @@ import FormField from "../../components/FormField/FormField";
 import Checkbox from "../../components/Checkbox/Checkbox";
 import Toast from "../../components/Toast/Toast";
 import { authService } from "../../services/authService";
-import { homeForRole } from "../../services/session";
+import { homeForRole, session } from "../../services/session";
 import { authError } from "../../utils/authError";
 import { formatLoginToast } from "../../features/studentArea/studentAreaModel";
 import "./SignIn.css";
@@ -20,13 +20,14 @@ export default function SignIn() {
   const [searchParams] = useSearchParams();
   const routeState = location.state as { from?: string; registered?: boolean; email?: string; suspended?: boolean } | null;
   const initialSuspended = Boolean(routeState?.suspended || searchParams.get("suspenso") || searchParams.get("acesso") === "suspenso");
+  const rememberedEmail = session.getRememberedEmail() || "";
   const [values, setValues] = useState<Credentials>({
-    email: routeState?.email || (initialSuspended ? "rafael@gymnasion.com.br" : ""),
+    email: routeState?.email || (initialSuspended ? "rafael@gymnasion.com.br" : rememberedEmail),
     password: initialSuspended ? "••••••••••" : "",
   });
   const [touched, setTouched] = useState<Partial<Record<keyof Credentials, boolean>>>({});
   const [submitted, setSubmitted] = useState(false);
-  const [remember, setRemember] = useState(false);
+  const [remember, setRemember] = useState(Boolean(rememberedEmail && !initialSuspended));
   const [error, setError] = useState(initialSuspended ? "O seu acesso encontra-se suspenso. Entre em contato com seu personal." : "");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const errors: Partial<Record<keyof Credentials, string>> = {};
@@ -44,6 +45,14 @@ export default function SignIn() {
       },
       disabled: isSubmitting,
     };
+  }
+
+  function handleRememberChange(event: ChangeEvent<HTMLInputElement>) {
+    const isChecked = event.target.checked;
+    setRemember(isChecked);
+    if (!isChecked) {
+      session.clearRememberedEmail();
+    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -79,7 +88,7 @@ export default function SignIn() {
       {routeState?.registered && <p className="auth-form__notice" role="status">Cadastro realizado com sucesso! Entre para continuar.</p>}
       <FormField id="signin-email" name="email" {...fieldProps("email")} label="E-mail" type="email" autoComplete="username" placeholder="seu@email.com" required />
       <FormField id="signin-password" name="password" {...fieldProps("password")} label="Senha" type="password" autoComplete="current-password" placeholder="Digite sua senha" required />
-      <div className="signin-form__options"><Checkbox label="Lembrar de mim" checked={remember} onChange={event => setRemember(event.target.checked)} disabled={isSubmitting} /><Link className="auth-form__link" to="/recuperar-senha">Esqueci minha senha</Link></div>
+      <div className="signin-form__options"><Checkbox id="signin-remember" name="remember" label="Lembrar de mim" checked={remember} onChange={handleRememberChange} disabled={isSubmitting} /><Link className="auth-form__link" to="/recuperar-senha">Esqueci minha senha</Link></div>
       <AuthCaptcha />
       <Button type="submit" className="auth-form__submit" loading={isSubmitting}>{isSubmitting ? "Entrando..." : "Entrar"}</Button>
       <div className="signin-form__divider"><span>ou</span></div>

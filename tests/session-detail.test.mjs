@@ -88,18 +88,20 @@ test("sessionDetailService maps all Figma screens to backend endpoints", async (
   assert.equal(calledMethod, "GET");
   assert.equal(calledParams?.size, 100);
 
-  // 6. Editar planejamento de sessão futura (Figma 551:8884 / US-10 C2)
+  // 6. Editar planejamento de sessão futura com métricas 0..N (Figma 551:8884 / US-10 C2)
   const payloadEdicao = {
     semana: 3,
     dataPlanejada: "2026-11-20",
     duracao: 45,
     atividades: "Aquecimento: 300m livre\nPrincipal: 4x100m medley",
+    metricasIds: ["m-1"],
   };
   await sessionDetailService.editarSessaoFutura("sess-100", payloadEdicao);
   assert.equal(calledUrl, "/api/personal-trainers/rotinas/sessoes/sess-100");
   assert.equal(calledMethod, "PUT");
   assert.equal(calledBody.duracao, 45);
   assert.equal(calledBody.dataPlanejada, "2026-11-20");
+  assert.deepEqual(calledBody.metricasIds, ["m-1"]);
 
   // 7. Enviar feedback ao aluno (US-26)
   await sessionDetailService.enviarFeedback("aluno-9", "Ótima consistência nos treinos!");

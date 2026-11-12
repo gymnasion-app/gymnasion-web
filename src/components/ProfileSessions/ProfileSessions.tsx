@@ -42,10 +42,12 @@ export default function ProfileSessions({
     setPage(1);
   }
 
-  const activeRoutineCount = useMemo(
-    () => routines.filter((r) => r.ativo !== false).length,
+  const activeRoutineIds = useMemo(
+    () => new Set(routines.filter((r) => r.ativo !== false).map((r) => r.id)),
     [routines]
   );
+  const activeRoutineCount = activeRoutineIds.size;
+  const isUnifiedRecent = recent && !activeRoutine && activeRoutineCount > 1;
 
   const routineTitleById = useMemo(
     () => new Map(routines.map((r) => [r.id, r.titulo])),
@@ -88,9 +90,11 @@ export default function ProfileSessions({
       .toLowerCase();
 
     const filtered = sessions.filter((s) => {
-      // No modo Visão Geral (recent), garante que apenas sessões da rotina ativa entrem
+      // No modo Visão Geral (recent), garante que apenas sessões da rotina selecionada (ou de todas ativas) entrem
       if (recent) {
-        if (!activeRoutine || s.rotinaTreinoId !== activeRoutine.id) {
+        if (activeRoutine) {
+          if (s.rotinaTreinoId !== activeRoutine.id) return false;
+        } else if (!isUnifiedRecent || !activeRoutineIds.has(s.rotinaTreinoId)) {
           return false;
         }
       } else if (historyScope === "active_only" && activeRoutine) {
@@ -129,17 +133,18 @@ export default function ProfileSessions({
     });
 
     if (recent) {
-      // Na visão da rotina ativa: prioriza sessões não realizadas ("PLANEJADA") ou aguardando validação no topo
+      // Na visão das rotinas ativas: prioriza sessões não realizadas no topo e ordena por data planejada
       return [...filtered].sort((a, b) => {
         const aDone = a.status === "CONCLUIDA" || a.concluidaAluno ? 1 : 0;
         const bDone = b.status === "CONCLUIDA" || b.concluidaAluno ? 1 : 0;
         if (aDone !== bDone) {
           return aDone - bDone;
         }
-        if (a.semana !== b.semana) {
-          return a.semana - b.semana;
+        const dateDiff = (a.dataPlanejada || "").localeCompare(b.dataPlanejada || "");
+        if (dateDiff !== 0) {
+          return dateDiff;
         }
-        return (a.dataPlanejada || "").localeCompare(b.dataPlanejada || "");
+        return a.semana - b.semana;
       });
     }
 
@@ -153,6 +158,8 @@ export default function ProfileSessions({
     sessions,
     recent,
     activeRoutine,
+    isUnifiedRecent,
+    activeRoutineIds,
     historyScope,
     statusFilter,
     weekFilter,
@@ -165,11 +172,18 @@ export default function ProfileSessions({
   const current = Math.min(page, pages);
   const displayed = filteredSessions.slice((current - 1) * pageSize, current * pageSize);
 
-  // Colunas de métricas (prioriza as métricas da rotina ativa quando em recent)
+  // Colunas de métricas (derivadas das sessões visíveis com fallback na rotina ativa)
   const metrics = useMemo(() => {
-    if (recent && activeRoutine) {
-      return activeRoutine.metricas
-        .filter((m) => m.tipo !== "TEXTO")
+    if (recent) {
+      const plannedSessionMetrics = filteredSessions.flatMap((s) => s.metricas || []);
+      const fallbackRoutineMetrics = activeRoutine?.metricas || [];
+      const source =
+        plannedSessionMetrics.length > 0 ? plannedSessionMetrics : fallbackRoutineMetrics;
+      return [
+        ...new Map(
+          source.filter((m) => m.tipo !== "TEXTO").map((m) => [m.id, m])
+        ).values(),
+      ]
         .slice(0, 2)
         .map((m) => ({
           metricaId: m.id,
@@ -184,9 +198,7 @@ export default function ProfileSessions({
           .map((m) => [m.metricaId, m])
       ).values(),
     ];
-    return recent
-      ? allMetrics.filter((m) => m.tipoMetrica !== "TEXTO").slice(0, 2)
-      : allMetrics.filter((m) => m.tipoMetrica !== "TEXTO").slice(0, 3);
+    return allMetrics.filter((m) => m.tipoMetrica !== "TEXTO").slice(0, 3);
   }, [recent, activeRoutine, filteredSessions]);
 
   const handleRowClick = (sessionId: string) => {
@@ -199,9 +211,18 @@ export default function ProfileSessions({
     <section className="workspace-card profile-sessions">
       <header className="profile-sessions__header">
         <div className="profile-sessions__title-group">
-          <h2>{recent ? "Sessões da rotina ativa" : "Histórico de sessões"}</h2>
+          <h2>
+            {recent
+              ? isUnifiedRecent
+                ? "Calendário completo (rotinas ativas)"
+                : "Sessões da rotina ativa"
+              : "Histórico de sessões"}
+          </h2>
           {recent && activeRoutine && (
             <Badge tone="primary">{activeRoutine.titulo}</Badge>
+          )}
+          {recent && isUnifiedRecent && (
+            <Badge tone="primary">{activeRoutineCount} rotinas ativas</Badge>
           )}
         </div>
         {onHistory && (
@@ -212,7 +233,7 @@ export default function ProfileSessions({
       </header>
 
       {/* Barra de filtros */}
-      {(recent ? Boolean(activeRoutine && sessions.length > 0) : sessions.length > 0) && (
+      {(recent ? Boolean((activeRoutine || isUnifiedRecent) && sessions.length > 0) : sessions.length > 0) && (
         <div className="profile-sessions__filters">
           <div className="profile-sessions__filter-group">
             <span className="profile-sessions__filter-label">
@@ -356,7 +377,7 @@ export default function ProfileSessions({
         </div>
       )}
 
-      {recent && !activeRoutine ? (
+      {recent && !activeRoutine && !isUnifiedRecent ? (
         <p className="profile-sessions__empty">
           Nenhuma rotina ativa vinculada a este aluno no momento. As sessões de rotinas anteriores podem ser consultadas na aba <strong>Histórico</strong>.
         </p>
@@ -416,9 +437,10 @@ export default function ProfileSessions({
                           : "")
                       : "";
                   const isCompleted = s.status === "CONCLUIDA" || s.concluidaAluno;
-                  const routineName = !recent
-                    ? routineTitleById.get(s.rotinaTreinoId)
-                    : null;
+                  const routineName =
+                    !recent || isUnifiedRecent
+                      ? routineTitleById.get(s.rotinaTreinoId)
+                      : null;
                   const durationPrefix =
                     recent && s.duracao !== null ? `${s.duracao} min · ` : "";
 

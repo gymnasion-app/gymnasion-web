@@ -1,5 +1,5 @@
-.ds-checkbox { display: inline-flex; align-items: center; gap: 8px; color: var(--color-text-secondary); cursor: pointer; font-size: 14px; }
-.ds-checkbox input { appearance: none; flex: 0 0 20px; width: 20px; height: 20px; margin: 0; border: 1.5px solid var(--color-ink-300); border-radius: 5px; background: var(--color-surface); cursor: pointer; }
+.ds-checkbox { display: inline-flex; align-items: center; gap: 8px; color: var(--color-text-secondary); cursor: pointer; font-size: 14px; user-select: none; }
+.ds-checkbox input { -webkit-appearance: none; appearance: none; flex: 0 0 20px; width: 20px; height: 20px; margin: 0; border: 1.5px solid var(--color-ink-300); border-radius: 5px; background: var(--color-surface); cursor: pointer; }
 .ds-checkbox input:checked { border-color: var(--color-primary-500); background: var(--color-primary-500) url('/design-system/imgIconCheck.svg') center no-repeat; }
 .ds-checkbox input:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; }
 .ds-checkbox:has(input:disabled) { opacity: .5; cursor: not-allowed; }

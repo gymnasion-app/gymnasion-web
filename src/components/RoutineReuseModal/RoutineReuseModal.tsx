@@ -27,7 +27,8 @@ export default function RoutineReuseModal({
   onClose,
   onReused,
 }: Props) {
-  const candidates = eligibleStudentsForRoutine(students, routines);
+  const routineModId = routine.modalidadeId ?? routine.modalidade?.id;
+  const candidates = eligibleStudentsForRoutine(students, routines, undefined, routineModId);
 
   const today = new Date().toISOString().slice(0, 10);
   const [alunoId, setAlunoId] = useState(candidates[0]?.id || "");
@@ -62,7 +63,7 @@ export default function RoutineReuseModal({
       setApiError(
         authError(
           err,
-          "Não foi possível reutilizar a rotina. Verifique se o aluno já possui rotina ativa."
+          "Não foi possível reutilizar a rotina. Verifique se o aluno possui a modalidade vinculada e nenhuma rotina ativa nela."
         ).message
       );
     } finally {
@@ -101,7 +102,7 @@ export default function RoutineReuseModal({
       <div className="routine-reuse">
         {candidates.length === 0 ? (
           <p className="routine-reuse__warning">
-            Não há alunos ativos disponíveis sem rotina ativa no momento.
+            Não há alunos ativos disponíveis com esta modalidade livre no momento.
           </p>
         ) : (
           <FormField

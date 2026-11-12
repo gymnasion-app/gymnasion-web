@@ -1,5 +1,17 @@
 import type { TrainingSession } from "./personalDashboard";
 
+export interface RotinaAtivaAcompanhamento {
+  rotinaId: string;
+  rotinaTitulo: string;
+  modalidadeId: number | null;
+  modalidadeNome: string;
+  frequenciaSemanal?: number;
+  quantidadeMetricasPendentes: number;
+  totalSessoesPlanejadas?: number;
+  totalSessoesConcluidas?: number;
+  sessoes: StudentTracking["sessoes"];
+}
+
 export interface StudentTracking {
   alunoId: string;
   rotinaAtivaId: string | null;
@@ -9,6 +21,7 @@ export interface StudentTracking {
     temPendenciasPersonal: boolean;
     quantidadePendenciasPersonal: number;
   })[];
+  rotinasAtivas?: RotinaAtivaAcompanhamento[];
 }
 export interface SessionExecution {
   alunoId: string;

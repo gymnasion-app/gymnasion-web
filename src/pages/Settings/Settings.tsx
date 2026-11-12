@@ -466,7 +466,7 @@ export default function Settings() {
       {changePasswordOpen && (
         <WorkspaceDialog
           title="Alterar senha"
-          description="Defina uma nova senha para acessar sua conta (política RN-002)."
+          description="Defina uma nova senha para acessar sua conta."
           tone="primary"
           onClose={() => setChangePasswordOpen(false)}
           busy={savingPassword}

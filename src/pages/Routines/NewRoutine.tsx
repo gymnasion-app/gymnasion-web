@@ -1,18 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { usePersonal } from "../../features/personal/PersonalContext";
 import {
   NEW_ROUTINE_DRAFT_KEY,
-  buildMetricCreateRedirectUrl,
   classifyStudentsForRoutine,
   extractProblemDetail,
-  filterAndSortRoutineMetrics,
   getAvatarColor,
   getModalityGroupsForRoutine,
-  getRequiredMetricIds,
   getStudentInitials,
-  metricLabels,
   normalize,
   parseNewRoutineDraft,
   serializeNewRoutineDraft,
@@ -20,12 +16,9 @@ import {
   validateCreateRoutinePayload,
   WEEK_DAYS,
 } from "../../features/routines/routineModel";
-import { getPreenchimentoLabel } from "../../features/metrics/metricModel";
 import { modalidadeService } from "../../services/modalidadeService";
-import { metricaService } from "../../services/metricaService";
 import { rotinaService } from "../../services/rotinaService";
 import type { Modalidade } from "../../types/modalidade";
-import type { MetricaResponseDTO, TipoMetrica } from "../../types/metric";
 import type { RotinaResponse } from "../../types/rotina";
 import WorkspaceDialog from "../../components/WorkspaceDialog/WorkspaceDialog";
 import "./NewRoutine.css";
@@ -41,13 +34,12 @@ function readInitialDraft(isEditMode: boolean) {
 
 export default function NewRoutine() {
   const navigate = useNavigate();
-  const location = useLocation();
   const [params] = useSearchParams();
   const { routineId } = useParams<{ routineId?: string }>();
   const isEditMode = Boolean(routineId);
   const { students, routines, groups, refresh } = usePersonal();
 
-  // Rascunho salvo em cache quando o personal sai para cadastrar métrica e retorna
+  // Rascunho salvo em cache durante a criação da rotina
   const initialDraft = useMemo(() => readInitialDraft(isEditMode), [isEditMode]);
 
   // URL params para pré-preenchimento
@@ -71,14 +63,6 @@ export default function NewRoutine() {
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>(
     () => initialDraft?.selectedStudentIds || []
   );
-  const [selectedMetricIds, setSelectedMetricIds] = useState<Set<string>>(
-    () => new Set(initialDraft?.selectedMetricIds || [])
-  );
-
-  // Métricas da modalidade e busca interna
-  const [metrics, setMetrics] = useState<MetricaResponseDTO[]>([]);
-  const [loadingMetrics, setLoadingMetrics] = useState(false);
-  const [metricSearch, setMetricSearch] = useState("");
 
   // Turmas selecionadas da modalidade
   const [sendToTurma, setSendToTurma] = useState(
@@ -137,8 +121,7 @@ export default function NewRoutine() {
         modalidadeId !== null ||
         frequenciaSemanal > 0 ||
         Boolean(objetivos.trim()) ||
-        selectedStudentIds.length > 0 ||
-        selectedMetricIds.size > 0;
+        selectedStudentIds.length > 0;
 
       if (hasAnyData) {
         window.sessionStorage.setItem(
@@ -149,7 +132,6 @@ export default function NewRoutine() {
             frequenciaSemanal,
             objetivos,
             selectedStudentIds,
-            selectedMetricIds: Array.from(selectedMetricIds),
             sendToTurma: sendToTurma || selectedTurmaIds.length > 0,
             selectedTurmaIds,
           })
@@ -167,7 +149,6 @@ export default function NewRoutine() {
     frequenciaSemanal,
     objetivos,
     selectedStudentIds,
-    selectedMetricIds,
     sendToTurma,
     selectedTurmaIds,
   ]);
@@ -197,9 +178,6 @@ export default function NewRoutine() {
         if (routine.alunos && routine.alunos.length > 0) {
           setSelectedStudentIds(routine.alunos.map((a) => a.id));
         }
-        if (routine.metricas && routine.metricas.length > 0) {
-          setSelectedMetricIds(new Set(routine.metricas.map((m) => m.id)));
-        }
       })
       .catch((err) => {
         if (!active) return;
@@ -216,7 +194,7 @@ export default function NewRoutine() {
     };
   }, [routineId, navigate]);
 
-  // Pré-seleciona aluno vindo por query param (?aluno=...)
+  // Pré-seleciona aluno vindo por query param (?aluno=...) e primeira modalidade livre
   useEffect(() => {
     if (initialStudentId && !routineId) {
       const student = students.data.find(
@@ -226,12 +204,26 @@ export default function NewRoutine() {
         setSelectedStudentIds((prev) =>
           prev.includes(initialStudentId) ? prev : [...prev, student.id]
         );
-        if (student.modalidades?.[0]?.id) {
-          setModalidadeId((prev) => prev ?? student.modalidades[0].id);
+        const activeModIds = new Set(
+          routines.data
+            .filter(
+              (r) =>
+                r.ativo !== false &&
+                r.status !== "ENCERRADA" &&
+                r.alunos.some((a) => a.id === student.id)
+            )
+            .map((r) => r.modalidadeId ?? r.modalidade?.id)
+            .filter((id): id is number => id != null)
+        );
+        const firstFree =
+          student.modalidades?.find((m) => !activeModIds.has(m.id)) ??
+          student.modalidades?.[0];
+        if (firstFree?.id) {
+          setModalidadeId((prev) => prev ?? firstFree.id);
         }
       }
     }
-  }, [initialStudentId, students.data, routineId]);
+  }, [initialStudentId, students.data, routines.data, routineId]);
 
   // Pré-preenche a partir de uma rotina modelo (?modelo=...)
   useEffect(() => {
@@ -242,42 +234,6 @@ export default function NewRoutine() {
       }
     }
   }, [modelRoutineId, routines.data, routineId]);
-
-  // Carrega métricas sempre que a modalidade muda (sem pré-selecionar automaticamente)
-  useEffect(() => {
-    if (!modalidadeId) {
-      setMetrics([]);
-      return;
-    }
-
-    let isCurrent = true;
-    setLoadingMetrics(true);
-
-    metricaService
-      .listarPorModalidade(modalidadeId)
-      .then((data) => {
-        if (!isCurrent) return;
-        const active = (data || []).filter((m) => m.ativo);
-        setMetrics(active);
-        const validIds = new Set(active.map((m) => m.id));
-        setSelectedMetricIds((prev) => {
-          if (prev.size === 0) return prev;
-          const filtered = Array.from(prev).filter((id) => validIds.has(id));
-          return new Set(filtered);
-        });
-      })
-      .catch(() => {
-        if (!isCurrent) return;
-        setMetrics([]);
-      })
-      .finally(() => {
-        if (isCurrent) setLoadingMetrics(false);
-      });
-
-    return () => {
-      isCurrent = false;
-    };
-  }, [modalidadeId]);
 
   // Fecha dropdown de alunos ao clicar fora
   useEffect(() => {
@@ -339,15 +295,6 @@ export default function NewRoutine() {
     );
   }, [busyStudents, studentSearch]);
 
-  // Métricas filtradas por busca e ordenadas com as selecionadas no topo
-  const visibleMetrics = useMemo(() => {
-    return filterAndSortRoutineMetrics(metrics, selectedMetricIds, metricSearch);
-  }, [metrics, selectedMetricIds, metricSearch]);
-
-  const requiredMetricIds = useMemo(() => {
-    return getRequiredMetricIds(metrics);
-  }, [metrics]);
-
   // Todas as turmas da modalidade selecionada
   const modalityTurmas = useMemo(() => {
     return getModalityGroupsForRoutine(turmas, modalidadeId);
@@ -377,32 +324,6 @@ export default function NewRoutine() {
     }
   }
 
-  function handleSelectRequiredMetrics() {
-    setSelectedMetricIds(new Set(requiredMetricIds));
-    if (requiredMetricIds.length > 0 && errors.metricasIds) {
-      setErrors((prev) => {
-        const next = { ...prev };
-        delete next.metricasIds;
-        return next;
-      });
-    }
-  }
-
-  function handleSelectAllMetrics() {
-    setSelectedMetricIds(new Set(metrics.map((m) => m.id)));
-    if (metrics.length > 0 && errors.metricasIds) {
-      setErrors((prev) => {
-        const next = { ...prev };
-        delete next.metricasIds;
-        return next;
-      });
-    }
-  }
-
-  function handleClearMetrics() {
-    setSelectedMetricIds(new Set());
-  }
-
   // Adiciona aluno chip
   function handleSelectStudent(studentId: string) {
     if (!selectedStudentIds.includes(studentId)) {
@@ -424,23 +345,6 @@ export default function NewRoutine() {
     setSelectedStudentIds((prev) => prev.filter((id) => id !== studentId));
   }
 
-  // Toggle de métrica
-  function handleToggleMetric(metricId: string) {
-    setSelectedMetricIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(metricId)) next.delete(metricId);
-      else next.add(metricId);
-      return next;
-    });
-    if (errors.metricasIds) {
-      setErrors((prev) => {
-        const next = { ...prev };
-        delete next.metricasIds;
-        return next;
-      });
-    }
-  }
-
   // Aplica uma rotina modelo
   function applyRoutineAsModel(routine: RotinaResponse) {
     setTitulo(routine.titulo);
@@ -453,112 +357,8 @@ export default function NewRoutine() {
     if (routine.objetivos) {
       setObjetivos(routine.objetivos);
     }
-    if (routine.metricas && routine.metricas.length > 0) {
-      setSelectedMetricIds(new Set(routine.metricas.map((m) => m.id)));
-    }
     setModelModalOpen(false);
     toast.success(`Campos preenchidos com o modelo “${routine.titulo}”!`);
-  }
-
-  // Renderiza ícone por tipo de métrica
-  function renderMetricIcon(tipo: TipoMetrica) {
-    switch (tipo) {
-      case "TEMPO":
-        return (
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <circle cx="12" cy="12" r="10" />
-            <polyline points="12 6 12 12 16 14" />
-          </svg>
-        );
-      case "FREQUENCIA_CARDIACA":
-        return (
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-          </svg>
-        );
-      case "TEXTO":
-        return (
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <line x1="8" y1="6" x2="21" y2="6" />
-            <line x1="8" y1="12" x2="21" y2="12" />
-            <line x1="8" y1="18" x2="21" y2="18" />
-            <line x1="3" y1="6" x2="3.01" y2="6" />
-            <line x1="3" y1="12" x2="3.01" y2="12" />
-            <line x1="3" y1="18" x2="3.01" y2="18" />
-          </svg>
-        );
-      case "NUMERICO":
-      default:
-        return (
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <line x1="4" y1="9" x2="20" y2="9" />
-            <line x1="4" y1="15" x2="20" y2="15" />
-            <line x1="10" y1="3" x2="8" y2="21" />
-            <line x1="16" y1="3" x2="14" y2="21" />
-          </svg>
-        );
-    }
-  }
-
-  // Salva o estado em cache e redireciona direto para o modal de criação de métrica
-  function handleNavigateToCreateMetric() {
-    const returnPath = `${location.pathname}${location.search}`;
-    if (!isEditMode) {
-      try {
-        window.sessionStorage.setItem(
-          NEW_ROUTINE_DRAFT_KEY,
-          serializeNewRoutineDraft({
-            titulo,
-            modalidadeId,
-            frequenciaSemanal,
-            objetivos,
-            selectedStudentIds,
-            selectedMetricIds: Array.from(selectedMetricIds),
-            sendToTurma: sendToTurma || selectedTurmaIds.length > 0,
-            selectedTurmaIds,
-          })
-        );
-      } catch {
-        // Ignora falhas de sessionStorage
-      }
-    }
-    navigate(buildMetricCreateRedirectUrl(modalidadeId, returnPath));
   }
 
   function clearRoutineDraftCache() {
@@ -579,7 +379,6 @@ export default function NewRoutine() {
       frequenciaSemanal,
       objetivos,
       alunosIds: selectedStudentIds,
-      metricasIds: Array.from(selectedMetricIds),
     };
 
     const validationErrors = validateCreateRoutinePayload(payload);
@@ -598,11 +397,6 @@ export default function NewRoutine() {
           title: "Título obrigatório",
           description: validationErrors.titulo,
         });
-      } else if (validationErrors.metricasIds) {
-        setValidationToast({
-          title: "Métricas necessárias",
-          description: "Selecione ao menos uma métrica para a rotina.",
-        });
       } else {
         setValidationToast({
           title: "Verifique os campos",
@@ -620,7 +414,6 @@ export default function NewRoutine() {
           frequenciaSemanal,
           objetivos,
           alunosIds: selectedStudentIds,
-          metricasIds: Array.from(selectedMetricIds),
         });
         toast.success("Rotina de treino atualizada com sucesso!");
         await refresh();
@@ -772,10 +565,8 @@ export default function NewRoutine() {
                       const id = Number(e.target.value);
                       setModalidadeId(id || null);
                       setSelectedStudentIds([]);
-                      setSelectedMetricIds(new Set());
                       setSelectedTurmaIds([]);
                       setSendToTurma(false);
-                      setMetricSearch("");
                       if (errors.modalidadeId) {
                         setErrors((prev) => {
                           const next = { ...prev };
@@ -872,12 +663,14 @@ export default function NewRoutine() {
                 )}
               </div>
             </div>
+          </div>
 
-            {/* CARD 3: Vincular alunos */}
-            <div className="new-routine-card" style={{ marginTop: 24 }}>
+          {/* COLUNA DIREITA: Card 2 (Vincular alunos) */}
+          <div className="new-routine-column-right">
+            <div className="new-routine-card">
               <div className="new-routine-card__header">
                 <div className="new-routine-card__titles">
-                  <h2>3 · Vincular alunos</h2>
+                  <h2>2 · Vincular alunos</h2>
                   <p>
                     Apenas alunos ativos de {selectedModalidadeNome} sem rotina
                     ativa aparecem aqui
@@ -986,7 +779,7 @@ export default function NewRoutine() {
                         {filteredBusyStudents.length > 0 && (
                           <div className="new-routine-dropdown__busy-section">
                             <div className="new-routine-dropdown__section-label">
-                              Já possuem rotina ativa em {selectedModalidadeNome} (RN-012)
+                              Já possuem rotina ativa em {selectedModalidadeNome}
                             </div>
                             {filteredBusyStudents.map((busyItem, idx) => {
                               const color = getAvatarColor(idx + 2);
@@ -1110,194 +903,6 @@ export default function NewRoutine() {
               </div>
             </div>
           </div>
-
-          {/* COLUNA DIREITA: Card 2 (Métricas acompanhadas) */}
-          <div className="new-routine-column-right">
-            <div className="new-routine-card new-routine-card--metrics">
-              <div className="new-routine-card__header">
-                <div className="new-routine-card__titles">
-                  <h2>2 · Métricas acompanhadas</h2>
-                  <p>
-                    {modalidadeId
-                      ? `Cadastradas para ${selectedModalidadeNome} · ${selectedMetricIds.size} ${
-                          selectedMetricIds.size === 1 ? "selecionada" : "selecionadas"
-                        }`
-                      : "Selecione uma modalidade no passo 1"}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className="new-routine-card__manage-link"
-                  onClick={handleNavigateToCreateMetric}
-                >
-                  + Cadastrar / Gerenciar →
-                </button>
-              </div>
-
-              {!modalidadeId ? (
-                <div className="new-routine-empty-metrics new-routine-empty-metrics--neutral">
-                  <div className="new-routine-empty-metrics__icon-wrap new-routine-empty-metrics__icon-wrap--neutral">
-                    2
-                  </div>
-                  <h3>Escolha primeiro a modalidade da rotina</h3>
-                  <p>
-                    Assim que você selecionar uma modalidade no campo ao lado, as métricas correspondentes aparecerão aqui.
-                  </p>
-                </div>
-              ) : loadingMetrics ? (
-                <div className="new-routine-metrics-loading">
-                  Carregando métricas...
-                </div>
-              ) : metrics.length === 0 ? (
-                /* Empty state quando a modalidade não tem métricas (Screenshot 5) */
-                <div className="new-routine-empty-metrics">
-                  <div className="new-routine-empty-metrics__icon-wrap">!</div>
-                  <h3>Nenhuma métrica cadastrada para essa modalidade.</h3>
-                  <p>Cadastre ao menos uma métrica antes de continuar.</p>
-                  <button
-                    type="button"
-                    className="new-routine-empty-metrics__btn"
-                    onClick={handleNavigateToCreateMetric}
-                  >
-                    + Cadastrar métrica
-                  </button>
-                </div>
-              ) : (
-                /* Toolbar de busca + ações rápidas e lista de métricas com scroll próprio */
-                <>
-                  <div className="new-routine-metrics-toolbar">
-                    <div className="new-routine-metrics-search">
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
-                      >
-                        <circle cx="11" cy="11" r="8" />
-                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                      </svg>
-                      <input
-                        type="text"
-                        placeholder="Buscar métrica por nome ou tipo..."
-                        value={metricSearch}
-                        onChange={(e) => setMetricSearch(e.target.value)}
-                        aria-label="Buscar métrica acompanhada"
-                      />
-                      {metricSearch && (
-                        <button
-                          type="button"
-                          className="new-routine-metrics-search__clear"
-                          onClick={() => setMetricSearch("")}
-                          aria-label="Limpar busca de métricas"
-                        >
-                          ×
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="new-routine-metrics-quick-actions">
-                      {requiredMetricIds.length > 0 && (
-                        <button
-                          type="button"
-                          className="new-routine-metrics-quick-btn"
-                          onClick={handleSelectRequiredMetrics}
-                        >
-                          Selecionar obrigatórias ({requiredMetricIds.length})
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        className="new-routine-metrics-quick-btn"
-                        onClick={handleSelectAllMetrics}
-                      >
-                        Todas ({metrics.length})
-                      </button>
-                      {selectedMetricIds.size > 0 && (
-                        <button
-                          type="button"
-                          className="new-routine-metrics-quick-btn new-routine-metrics-quick-btn--clear"
-                          onClick={handleClearMetrics}
-                        >
-                          Limpar ({selectedMetricIds.size})
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="new-routine-metrics-scroll">
-                    <div
-                      className="new-routine-metrics-scroll__fade new-routine-metrics-scroll__fade--top"
-                      aria-hidden="true"
-                    />
-                    {visibleMetrics.length === 0 ? (
-                      <div className="new-routine-dropdown__empty">
-                        Nenhuma métrica encontrada para “{metricSearch}”.
-                      </div>
-                    ) : (
-                      <div className="new-routine-metrics-list">
-                        {visibleMetrics.map((item) => {
-                          const isSelected = selectedMetricIds.has(item.id);
-                          return (
-                            <div
-                              key={item.id}
-                              className={`new-routine-metric-card ${
-                                isSelected ? "is-selected" : ""
-                              }`}
-                              onClick={() => handleToggleMetric(item.id)}
-                            >
-                              <div className="new-routine-metric-checkbox">
-                                {isSelected && (
-                                  <svg
-                                    width="12"
-                                    height="12"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="#ffffff"
-                                    strokeWidth="3.5"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                  >
-                                    <polyline points="20 6 9 17 4 12" />
-                                  </svg>
-                                )}
-                              </div>
-
-                              <div className="new-routine-metric-icon">
-                                {renderMetricIcon(item.tipo)}
-                              </div>
-
-                              <div className="new-routine-metric-info">
-                                <h4>{item.titulo}</h4>
-                                <p>
-                                  {metricLabels[item.tipo] || item.tipo} ·{" "}
-                                  {item.obrigatoria !== false ? "Obrigatória" : "Opcional"} · preenche:{" "}
-                                  {getPreenchimentoLabel(item.quemPreenche)}
-                                </p>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                    <div
-                      className="new-routine-metrics-scroll__fade new-routine-metrics-scroll__fade--bottom"
-                      aria-hidden="true"
-                    />
-                  </div>
-                </>
-              )}
-              {errors.metricasIds && (
-                <div className="new-routine-field__error" style={{ marginTop: 10 }}>
-                  {errors.metricasIds}
-                </div>
-              )}
-            </div>
-          </div>
         </div>
 
         {/* Rodapé da Página: Cancelar e Criar */}
@@ -1346,7 +951,9 @@ export default function NewRoutine() {
                 <strong>{r.titulo}</strong>
                 <span>
                   {r.nomeModalidade} · {r.frequenciaSemanal}x/sem ·{" "}
-                  {r.metricas?.length || 0} métricas
+                  {r.metricas && r.metricas.length > 0
+                    ? `${r.metricas.length} ${r.metricas.length === 1 ? "métrica nas sessões" : "métricas nas sessões"}`
+                    : "Sem métricas nas sessões"}
                 </span>
               </button>
             ))}

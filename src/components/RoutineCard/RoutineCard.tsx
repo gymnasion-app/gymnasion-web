@@ -5,6 +5,8 @@ import { isRoutineActive, metricIcons, metricLabels } from "../../features/routi
 import type { RotinaResponse } from "../../types/rotina";
 import "./RoutineCard.css";
 
+const MAX_VISIBLE_METRICS = 3;
+
 interface Props {
   routine: RotinaResponse;
   onAssign?: (routine: RotinaResponse) => void;
@@ -131,21 +133,43 @@ export default function RoutineCard({
         )}
 
         <div className="routine-card-v2__section">
-          <h3>Métricas acompanhadas ({metrics.length})</h3>
+          <h3>Métricas nas sessões ({metrics.length})</h3>
           <div className="routine-card-v2__metrics">
-            {metrics.map((m) => {
-              const icon = metricIcons[m.tipo] || "imgIconActivity1";
-              return (
-                <span
-                  key={m.id}
-                  className="routine-card-v2__metric-chip"
-                  title={`${m.titulo} (${metricLabels[m.tipo] || m.tipo})`}
-                >
-                  <img src={`/student-profile/${icon}.svg`} alt="" />
-                  <strong>{m.titulo}</strong>
-                </span>
-              );
-            })}
+            {metrics.length === 0 ? (
+              <span
+                className="routine-card-v2__metric-chip"
+                title="As sessões desta rotina registram apenas RPE e duração"
+              >
+                Apenas RPE e duração
+              </span>
+            ) : (
+              <>
+                {metrics.slice(0, MAX_VISIBLE_METRICS).map((m) => {
+                  const icon = metricIcons[m.tipo] || "imgIconActivity1";
+                  return (
+                    <span
+                      key={m.id}
+                      className="routine-card-v2__metric-chip"
+                      title={`${m.titulo} (${metricLabels[m.tipo] || m.tipo})`}
+                    >
+                      <img src={`/student-profile/${icon}.svg`} alt="" />
+                      <strong>{m.titulo}</strong>
+                    </span>
+                  );
+                })}
+                {metrics.length > MAX_VISIBLE_METRICS && (
+                  <span
+                    className="routine-card-v2__metric-chip"
+                    title={metrics
+                      .slice(MAX_VISIBLE_METRICS)
+                      .map((m) => m.titulo)
+                      .join(", ")}
+                  >
+                    <strong>+{metrics.length - MAX_VISIBLE_METRICS}</strong>
+                  </span>
+                )}
+              </>
+            )}
           </div>
         </div>
 

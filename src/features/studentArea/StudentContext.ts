@@ -25,6 +25,7 @@ export interface StudentActiveRoutineInfo {
   id: string;
   titulo: string;
   modalidade: string;
+  modalidadeId?: number;
   frequenciaSemanal: number;
   objetivos: string;
   totalSemanas: number;
@@ -42,6 +43,9 @@ export interface StudentExecutionConfirmDetails {
 export interface StudentContextValue {
   student: StudentIdentityInfo;
   activeRoutine: StudentActiveRoutineInfo | null;
+  activeRoutines: StudentActiveRoutineInfo[];
+  selectedModalityFilter: number | "ALL";
+  setSelectedModalityFilter: (filter: number | "ALL") => void;
   loading: boolean;
   selectedWeekNum: number;
   setSelectedWeekNum: (num: number) => void;

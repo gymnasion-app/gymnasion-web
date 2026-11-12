@@ -6,7 +6,7 @@ import ts from "typescript";
 const source = readFileSync(new URL("../src/features/personal/studentModel.ts",import.meta.url),"utf8");
 const exports = {};
 runInNewContext(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports});
-const { visibleStudents, studentCounts, applyStudentMutation, studentsWithoutRoutine } = exports;
+const { visibleStudents, studentCounts, applyStudentMutation, studentsWithoutRoutine, filterModalities } = exports;
 const aluno = (id,nome,status,modality=1) => ({id,usuario:{nome,email:nome+"@example.test"},status,modalidades:[{id:modality,nome:"Natação"}]});
 const data = [aluno("a","André","ATIVO"),aluno("b","Bruna","INATIVO",2),aluno("c","Caio","PENDENTE"),aluno("d","Diana","ATIVO")];
 const ids = values => Array.from(values,item=>item.id);
@@ -74,4 +74,50 @@ test("RPE range keeps date-only values in local time",()=>{
 test("last session is selected for the correct student",()=>{
   assert.equal(lastSession(histories,"a").id,"s2");
   assert.equal(lastSession(histories,"missing"),undefined);
+});
+test("personalTrainerService sends hybrid modalidadesIds on invites and modality updates", async () => {
+  const calls = [];
+  const mockApi = {
+    post: async (url, body) => {
+      calls.push(["POST", url, body]);
+      return { data: { url: "https://gymnasion.test/convite" } };
+    },
+    put: async (url, body) => {
+      calls.push(["PUT", url, body]);
+      return { data: { id: "a1", modalidades: [{ id: 1, nome: "Natação" }, { id: 2, nome: "Musculação" }] } };
+    },
+  };
+  const ptExports = {};
+  runInNewContext(
+    ts.transpileModule(readFileSync(new URL("../src/services/personalTrainerService.ts", import.meta.url), "utf8"), {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+    }).outputText,
+    {
+      exports: ptExports,
+      require: (name) => {
+        if (name === "./api") return { api: mockApi };
+        return {};
+      },
+    }
+  );
+  await ptExports.personalTrainerService.gerarConvite([1, 2], "atleta@gymnasion.test");
+  await ptExports.personalTrainerService.gerarConvite(3);
+  await ptExports.personalTrainerService.atualizarModalidades("a1", [1, 2]);
+  assert.equal(JSON.stringify(calls), JSON.stringify([
+    ["POST", "/api/personal-trainers/convites", { modalidadesIds: [1, 2], modalidadeId: 1, emailAluno: "atleta@gymnasion.test" }],
+    ["POST", "/api/personal-trainers/convites", { modalidadesIds: [3], modalidadeId: 3 }],
+    ["PUT", "/api/personal-trainers/alunos/a1/modalidades", { modalidadesIds: [1, 2] }],
+  ]));
+});
+test("filterModalities sorts alphabetically and searches accent-insensitively", () => {
+  const catalog = [
+    { id: 1, nome: "Remo" },
+    { id: 2, nome: "Natação" },
+    { id: 3, nome: "Academia" },
+    { id: 4, nome: "Karatê" },
+  ];
+  assert.deepEqual(Array.from(filterModalities(catalog, ""), (m) => m.nome), ["Academia", "Karatê", "Natação", "Remo"]);
+  assert.deepEqual(Array.from(filterModalities(catalog, "natacao"), (m) => m.nome), ["Natação"]);
+  assert.deepEqual(Array.from(filterModalities(catalog, "karate"), (m) => m.nome), ["Karatê"]);
+  assert.deepEqual(Array.from(filterModalities(catalog, "inexistente"), (m) => m.nome), []);
 });

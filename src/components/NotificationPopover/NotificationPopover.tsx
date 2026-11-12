@@ -18,6 +18,8 @@ export interface NotificationPopoverProps {
   onClose: () => void;
   onRead: (id?: string) => Promise<boolean | void> | void;
   onRetry?: () => void;
+  triggerRef?: React.RefObject<HTMLElement | null>;
+  isClosing?: boolean;
 }
 
 function NotificationCategoryIcon({ category }: { category: NotificationCategory }) {
@@ -77,6 +79,8 @@ export default function NotificationPopover({
   onClose,
   onRead,
   onRetry,
+  triggerRef,
+  isClosing = false,
 }: NotificationPopoverProps) {
   const popoverRef = useRef<HTMLDivElement>(null);
   const [activeFilter, setActiveFilter] = useState<NotificationFilter>("all");
@@ -109,10 +113,15 @@ export default function NotificationPopover({
       if (event.key === "Escape") {
         event.preventDefault();
         onClose();
+        triggerRef?.current?.focus();
       }
     };
     const handleClickOutside = (event: MouseEvent) => {
-      if (popoverRef.current && !popoverRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (triggerRef?.current && triggerRef.current.contains(target)) {
+        return;
+      }
+      if (popoverRef.current && !popoverRef.current.contains(target)) {
         onClose();
       }
     };
@@ -127,7 +136,7 @@ export default function NotificationPopover({
       document.removeEventListener("mousedown", handleClickOutside);
       clearTimeout(timer);
     };
-  }, [onClose]);
+  }, [onClose, triggerRef]);
 
   const renderNotificationEntry = (item: PersonalNotification) => {
     const meta = getNotificationCategoryMeta(item);
@@ -192,7 +201,7 @@ export default function NotificationPopover({
   return (
     <div
       ref={popoverRef}
-      className="notification-popover"
+      className={`notification-popover ${isClosing ? "is-closing" : ""}`}
       role="dialog"
       aria-modal="false"
       aria-label="Central de notificações"

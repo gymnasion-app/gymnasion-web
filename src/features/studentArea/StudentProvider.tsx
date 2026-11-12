@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { alunoService } from "../../services/alunoService";
@@ -6,12 +6,12 @@ import { localDateKey } from "../personal/dashboardModel";
 import { StudentContext, type StudentActiveRoutineInfo, type StudentIdentityInfo } from "./StudentContext";
 import {
   applySessionExecution,
+  buildUnifiedCalendarWeeks,
   buildWeekDaysSummary,
   countCompletedSessions,
-  formatDiaSemanaPt,
   formatDataPlanejadaDdMm,
+  mapPlanningToWeeks,
 } from "./studentAreaModel";
-import { parseAtividades } from "../../utils/activityParser";
 import { sortNotificationsByPriority } from "../notifications/notificationModel";
 import type {
   StudentFeedbackItem,
@@ -21,13 +21,38 @@ import type {
 } from "../../types/studentArea";
 import type { PersonalNotification } from "../../types/personalDashboard";
 
+interface RoutineEntry {
+  info: StudentActiveRoutineInfo;
+  weeks: StudentRoutineWeek[];
+  currentWeekNum: number;
+}
+
+function resolveWeeksForFilter(
+  entries: RoutineEntry[],
+  filter: number | "ALL"
+): StudentRoutineWeek[] {
+  const matching =
+    filter === "ALL"
+      ? entries
+      : entries.filter((e) => e.info.modalidadeId === filter);
+  if (matching.length === 0) return [];
+  if (matching.length === 1) return matching[0].weeks;
+  return buildUnifiedCalendarWeeks(
+    matching.map((e) => ({ routine: e.info, weeks: e.weeks })),
+    localDateKey(new Date())
+  );
+}
+
 export default function StudentProvider({ children }: { children: ReactNode }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeRoutine, setActiveRoutine] = useState<StudentActiveRoutineInfo | null>(null);
+  const [routineEntries, setRoutineEntries] = useState<RoutineEntry[]>([]);
+  const [selectedModalityFilterState, setSelectedModalityFilterState] = useState<number | "ALL">("ALL");
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedWeekNum, setSelectedWeekNum] = useState<number>(1);
-  const [weeks, setWeeks] = useState<StudentRoutineWeek[]>([]);
   const [historicalRoutines, setHistoricalRoutines] = useState<StudentHistoricalRoutine[]>([]);
+  const filterInitialized = useRef(false);
+  const userPickedFilter = useRef(false);
+  const selectedFilterRef = useRef<number | "ALL">("ALL");
   const [feedbacks, setFeedbacks] = useState<StudentFeedbackItem[]>([]);
   const [unreadNotifications, setUnreadNotifications] = useState<number>(0);
   const [notifications, setNotifications] = useState<{
@@ -173,11 +198,15 @@ export default function StudentProvider({ children }: { children: ReactNode }) {
         })
         .catch(() => {});
 
-      // 3. Carrega rotinas reais do aluno
+      // 3. Carrega rotinas reais do aluno (suporta múltiplas rotinas ativas para atleta híbrido)
       const rotinas = await alunoService.listarRotinas();
       if (Array.isArray(rotinas) && rotinas.length > 0) {
-        const rotinaAtiva = rotinas.find((r) => r.ativo) || rotinas[0];
-        const rotinasEncerradas = rotinas.filter((r) => !r.ativo);
+        const rotinasAtivasRaw = rotinas.filter(
+          (r) => r.ativo !== false && r.status !== "ENCERRADA"
+        );
+        const rotinasEncerradas = rotinas.filter(
+          (r) => r.ativo === false || r.status === "ENCERRADA"
+        );
 
         setHistoricalRoutines(
           rotinasEncerradas.map((r) => ({
@@ -186,132 +215,108 @@ export default function StudentProvider({ children }: { children: ReactNode }) {
             periodo: `${r.frequenciaSemanal}x por semana`,
             semanas: 4,
             status: "ENCERRADA",
-            modalidade: r.nomeModalidade || "Treino",
+            modalidade: r.nomeModalidade || r.modalidade?.nome || "Treino",
             objetivo: r.objetivos || "Sem objetivos cadastrados.",
             sessoesConcluidas: 0,
           }))
         );
 
-        if (rotinaAtiva) {
-          const plan = await alunoService.consultarPlanejamento(rotinaAtiva.id);
-          const semanasBackend = plan.semanas || [];
-          
-          let numSemanaAtual = 1;
-          if (semanasBackend.length > 0) {
-            const semanaComPendente = semanasBackend.find((sem) =>
-              (sem.sessoes || []).some(
-                (s) =>
-                  !s.concluidaAluno &&
-                  !s.validadaPersonal &&
-                  s.status !== "CONCLUIDA" &&
-                  s.status !== "VALIDADA"
-              )
-            );
-            numSemanaAtual = semanaComPendente
-              ? semanaComPendente.numeroSemana
-              : semanasBackend[semanasBackend.length - 1].numeroSemana;
+        if (rotinasAtivasRaw.length > 0) {
+          const planResults = await Promise.allSettled(
+            rotinasAtivasRaw.map((r) => alunoService.consultarPlanejamento(r.id))
+          );
+
+          const nextEntries: RoutineEntry[] = [];
+          rotinasAtivasRaw.forEach((rotina, idx) => {
+            const res = planResults[idx];
+            if (res.status === "fulfilled") {
+              nextEntries.push(mapPlanningToWeeks(rotina, res.value.semanas || []));
+            } else {
+              nextEntries.push(mapPlanningToWeeks(rotina, []));
+            }
+          });
+
+          setRoutineEntries(nextEntries);
+
+          let nextFilter: number | "ALL" = selectedFilterRef.current;
+          const hasCurrentFilter =
+            nextFilter === "ALL" ||
+            nextEntries.some((e) => e.info.modalidadeId === nextFilter);
+
+          if (!filterInitialized.current || !userPickedFilter.current || !hasCurrentFilter) {
+            nextFilter =
+              nextEntries.length === 1
+                ? (nextEntries[0].info.modalidadeId ?? "ALL")
+                : "ALL";
+            selectedFilterRef.current = nextFilter;
+            setSelectedModalityFilterState(nextFilter);
           }
-          setSelectedWeekNum(numSemanaAtual);
 
-          setActiveRoutine({
-            id: rotinaAtiva.id,
-            titulo: rotinaAtiva.titulo,
-            modalidade: rotinaAtiva.nomeModalidade || "Treino",
-            frequenciaSemanal: rotinaAtiva.frequenciaSemanal || 3,
-            objetivos: rotinaAtiva.objetivos || "Desenvolver resistência e capacidade física.",
-            totalSemanas: Math.max(semanasBackend.length, numSemanaAtual),
-            semanaAtual: numSemanaAtual,
-            metricas: (rotinaAtiva.metricas || []).map((m) => ({
-              id: m.id,
-              titulo: m.titulo,
-              tipo: m.tipo,
-              obrigatoria: Boolean(m.obrigatoria),
-              quemPreenche: m.quemPreenche || "ALUNO",
-            })),
-          });
-
-          let highlightAssigned = false;
-          const mappedWeeks: StudentRoutineWeek[] = semanasBackend.map((sem) => {
-            const isAtual = sem.numeroSemana === numSemanaAtual;
-            const isAnterior = sem.numeroSemana < numSemanaAtual;
-            const estado: "anterior" | "atual" | "bloqueada" = isAtual
-              ? "atual"
-              : isAnterior
-              ? "anterior"
-              : "bloqueada";
-
-            const sessoes: StudentWorkoutSession[] = (sem.sessoes || []).map((s, idx) => {
-              const status = (s.validadaPersonal || s.status === "VALIDADA"
-                ? "VALIDADA"
-                : s.concluidaAluno || s.status === "CONCLUIDA"
-                ? "CONCLUIDA"
-                : "PLANEJADA") as "PLANEJADA" | "CONCLUIDA" | "VALIDADA";
-
-              let destaque = false;
-              if (isAtual && status === "PLANEJADA" && !highlightAssigned) {
-                destaque = true;
-                highlightAssigned = true;
-              }
-
-              const diaSemana = formatDiaSemanaPt(s.dataPlanejada);
-              const dataDdMm = formatDataPlanejadaDdMm(s.dataPlanejada);
-              const rpe = s.desempenho?.nivelCansaco ?? null;
-              const parsed = parseAtividades(s.atividades);
-              const headline = parsed.sessionName || parsed.activities[0]?.title || "";
-
-              return {
-                id: s.id,
-                numero: idx + 1,
-                semana: sem.numeroSemana,
-                diaSemana,
-                dataPlanejada: dataDdMm,
-                dataPlanejadaIso: s.dataPlanejada,
-                titulo: headline ? `Sessão ${idx + 1} · ${headline}` : `Sessão ${idx + 1}`,
-                descricao: s.atividades || "Sem descrição informada.",
-                duracaoPlanejada: s.duracao || 50,
-                duracaoReal: s.duracao,
-                dataReal: s.dataReal ? formatDataPlanejadaDdMm(s.dataReal) : null,
-                status,
-                destaque,
-                rpe,
-                resultados: (s.desempenho?.metricas || []).map((m) => ({
-                  metricaId: m.metricaId,
-                  titulo: m.titulo || m.tituloMetrica || "Métrica",
-                  tipo: m.tipo || m.tipoMetrica || "NUMERICO",
-                  valor: m.valor,
-                })),
-              };
-            });
-
-            return {
-              numero: sem.numeroSemana,
-              titulo: `Semana ${sem.numeroSemana}`,
-              periodo: isAtual ? "Semana atual" : isAnterior ? "anterior" : "bloqueada",
-              estado,
-              sessoes,
-            };
-          });
-
-          setWeeks(mappedWeeks);
+          if (!filterInitialized.current) {
+            const initialWeeks = resolveWeeksForFilter(nextEntries, nextFilter);
+            const atual = initialWeeks.find((w) => w.estado === "atual") || initialWeeks[0];
+            if (atual) {
+              setSelectedWeekNum(atual.numero);
+            }
+            filterInitialized.current = true;
+          }
         } else {
-          setWeeks([]);
-          setActiveRoutine(null);
+          setRoutineEntries([]);
+          selectedFilterRef.current = "ALL";
+          setSelectedModalityFilterState("ALL");
         }
       } else {
         // Aluno sem rotinas no backend ainda
-        setWeeks([]);
+        setRoutineEntries([]);
         setHistoricalRoutines([]);
-        setActiveRoutine(null);
+        selectedFilterRef.current = "ALL";
+        setSelectedModalityFilterState("ALL");
       }
     } catch {
       // Se der erro ao carregar do backend, inicializa vazio em vez de mock antigo
-      setWeeks([]);
+      setRoutineEntries([]);
       setHistoricalRoutines([]);
-      setActiveRoutine(null);
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const activeRoutines = useMemo(
+    () => routineEntries.map((entry) => entry.info),
+    [routineEntries]
+  );
+
+  const setSelectedModalityFilter = useCallback(
+    (filter: number | "ALL") => {
+      userPickedFilter.current = true;
+      selectedFilterRef.current = filter;
+      setSelectedModalityFilterState(filter);
+      const nextWeeks = resolveWeeksForFilter(routineEntries, filter);
+      const atual = nextWeeks.find((w) => w.estado === "atual") || nextWeeks[0];
+      setSelectedWeekNum(atual?.numero ?? 1);
+    },
+    [routineEntries]
+  );
+
+  const filteredEntries = useMemo(
+    () =>
+      selectedModalityFilterState === "ALL"
+        ? routineEntries
+        : routineEntries.filter(
+            (e) => e.info.modalidadeId === selectedModalityFilterState
+          ),
+    [routineEntries, selectedModalityFilterState]
+  );
+
+  const weeks = useMemo(
+    () => resolveWeeksForFilter(routineEntries, selectedModalityFilterState),
+    [routineEntries, selectedModalityFilterState]
+  );
+
+  const activeRoutine = useMemo(
+    () => filteredEntries[0]?.info ?? activeRoutines[0] ?? null,
+    [filteredEntries, activeRoutines]
+  );
 
   useEffect(() => {
     void loadData();
@@ -374,15 +379,18 @@ export default function StudentProvider({ children }: { children: ReactNode }) {
         }
 
         const formattedRealDate = formatDataPlanejadaDdMm(realIso);
-        setWeeks((prev) =>
-          applySessionExecution(
-            prev,
-            rpeModalSessionId,
-            rpe,
-            formattedRealDate,
-            details?.resultados,
-            details?.duracao
-          )
+        setRoutineEntries((prev) =>
+          prev.map((entry) => ({
+            ...entry,
+            weeks: applySessionExecution(
+              entry.weeks,
+              rpeModalSessionId,
+              rpe,
+              formattedRealDate,
+              details?.resultados,
+              details?.duracao
+            ),
+          }))
         );
         toast.success(
           rpe !== null
@@ -483,6 +491,9 @@ export default function StudentProvider({ children }: { children: ReactNode }) {
       value={{
         student,
         activeRoutine,
+        activeRoutines,
+        selectedModalityFilter: selectedModalityFilterState,
+        setSelectedModalityFilter,
         loading,
         selectedWeekNum,
         setSelectedWeekNum,

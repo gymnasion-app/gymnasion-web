@@ -1,7 +1,9 @@
 .routines-page {
   padding: 0 0 48px;
-  max-width: 1240px;
-  margin: 0 auto;
+  inline-size: 100%;
+  min-inline-size: 0;
+  max-inline-size: 1240px;
+  margin-inline: auto;
 }
 
 /* Header Bar: Main Workspace Tabs (Em Andamento vs Biblioteca de Modelos vs Encerrados) + Create CTA */
@@ -292,9 +294,11 @@
   border: 1px solid #eaecf0;
   border-radius: 12px;
   box-shadow: 0 1px 3px rgba(16, 24, 40, 0.05);
+  min-inline-size: 0;
 }
 
 .routines-page__table-wrapper {
+  overflow-x: auto;
   max-inline-size: 100%;
   container-type: inline-size;
   border-radius: 12px;
@@ -306,7 +310,8 @@
 }
 
 .routines-page__table {
-  width: 100%;
+  inline-size: 100%;
+  table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
   text-align: left;
@@ -335,12 +340,12 @@
 }
 
 .routines-page__table th {
-  padding: 13px 20px;
+  padding: 13px 12px;
   font-size: 12px;
   font-weight: 600;
   color: #475467;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   white-space: nowrap;
   border-bottom: 1px solid #eaecf0;
   background-color: #f9fafb;
@@ -348,9 +353,29 @@
 
 .routines-page__table th:first-child {
   border-top-left-radius: 12px;
+  padding-inline-start: 20px;
+}
+
+.routines-page__table th:nth-child(2) {
+  inline-size: 128px;
+}
+
+.routines-page__table th:nth-child(3) {
+  inline-size: 164px;
+}
+
+.routines-page__table th:nth-child(4) {
+  inline-size: 154px;
+}
+
+.routines-page__table th:nth-child(5) {
+  inline-size: 124px;
 }
 
 .routines-page__table th:last-child {
+  inline-size: 184px;
+  text-align: right;
+  padding-inline-end: 16px;
   border-top-right-radius: 12px;
 }
 
@@ -379,8 +404,16 @@
 }
 
 .routines-page__table td {
-  padding: 16px 20px;
+  padding: 15px 12px;
   vertical-align: middle;
+}
+
+.routines-page__table td:first-child {
+  padding-inline-start: 20px;
+}
+
+.routines-page__table td:last-child {
+  padding-inline-end: 16px;
 }
 
 /* 1. Coluna Rotina & Status / Escopo */
@@ -398,6 +431,7 @@
   font-weight: 600;
   color: #101828;
   line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .routines-page__col-routine p {
@@ -405,7 +439,7 @@
   font-size: 13.5px;
   color: #667085;
   line-height: 1.4;
-  max-width: 340px;
+  max-inline-size: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -663,12 +697,12 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 6px;
+  gap: 5px;
 }
 
 .routines-page__btn-plan {
-  height: 32px;
-  padding: 0 11px;
+  height: 31px;
+  padding: 0 10px;
   border-radius: 8px;
   border: 1px solid #fed7aa;
   background: #fff7ed;
@@ -678,7 +712,7 @@
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   transition: all 0.15s ease;
   white-space: nowrap;
 }
@@ -690,8 +724,8 @@
 }
 
 .routines-page__action-icon-btn {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   border-radius: 8px;
   border: 1px solid #eaecf0;
   background: #ffffff;
@@ -822,7 +856,11 @@
 }
 
 /* Container Query para Layout Empilhado Responsivo (Modern Web Guidance: responsive-table) */
-@container (width < 680px) {
+@container (width < 900px) {
+  .routines-page__table {
+    table-layout: auto;
+  }
+
   .routines-page__table,
   .routines-page__table thead,
   .routines-page__table tbody,
@@ -843,7 +881,7 @@
 
   .routines-page__table td {
     padding: 8px 0;
-    border-bottom: none !important;
+    border-bottom: none;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -853,9 +891,9 @@
   .routines-page__table td:first-child {
     flex-direction: column;
     align-items: flex-start;
-    padding-bottom: 12px;
+    padding: 4px 0 12px;
     margin-bottom: 4px;
-    border-bottom: 1px solid #f2f4f7 !important;
+    border-bottom: 1px solid #f2f4f7;
   }
 
   .routines-page__table td:nth-child(2)::before {

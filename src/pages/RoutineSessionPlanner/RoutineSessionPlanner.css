@@ -223,12 +223,42 @@
   align-items: start;
 }
 
+@media (min-width: 1061px) {
+  /* Alinha a base da coluna direita com o último bloco da esquerda (Orientações ao aluno) */
+  .session-planner__grid.is-composer-active {
+    align-items: stretch;
+  }
+
+  .session-planner__grid.is-composer-active > .session-planner__right-col {
+    block-size: 0;
+    min-block-size: 100%;
+  }
+
+  .session-planner__grid:not(.is-composer-active) .session-planner__week-panel {
+    max-block-size: min(760px, 78dvh);
+  }
+}
+
 .session-planner__left-col,
 .session-planner__right-col {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  min-width: 0;
+  min-inline-size: 0;
+}
+
+.session-planner__week-panel {
+  flex: 1 1 auto;
+  min-block-size: 0;
+  min-inline-size: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.session-planner__week-panel-head {
+  flex-shrink: 0;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
 }
 
 .session-planner__card {
@@ -771,11 +801,140 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  margin-bottom: 14px;
-  padding: 12px 14px;
+  flex-shrink: 0;
+  margin-bottom: 12px;
+  padding: 10px 14px;
   border-radius: 12px;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
+}
+
+.week-sessions-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-bottom: 12px;
+}
+
+.week-sessions-filters {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.week-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+
+.week-filter-chip span {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.week-filter-chip:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.week-filter-chip.is-active {
+  border-color: #fb923c;
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.week-filter-chip.is-active span {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.week-sessions-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.week-sessions-search__icon {
+  position: absolute;
+  inset-inline-start: 10px;
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.week-sessions-search input {
+  inline-size: 100%;
+  min-inline-size: 0;
+  padding: 7px 30px 7px 30px;
+  border-radius: 9px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #0f172a;
+  font-size: 13px;
+  font-family: inherit;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.week-sessions-search input:focus {
+  outline: 2px solid #fb923c;
+  outline-offset: -1px;
+  border-color: #ea580c;
+  background: #ffffff;
+}
+
+.week-sessions-search__clear {
+  position: absolute;
+  inset-inline-end: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 22px;
+  block-size: 22px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.week-sessions-search__clear:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.week-sessions-no-match {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 28px 16px;
+  text-align: center;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  color: #64748b;
+  font-size: 13.5px;
+}
+
+.week-sessions-no-match p {
+  margin: 0;
 }
 
 .workload-kpi {
@@ -884,19 +1043,135 @@
   white-space: nowrap;
 }
 
-/* Cards de Sessão da Semana (Timeline Limpa) */
+/* Área rolável e cards de Sessão da Semana */
+.session-planner__week-sessions-scroll {
+  --planner-scrollbar-thumb: #64748b;
+  --planner-scrollbar-thumb-hover: #475569;
+  --planner-scrollbar-track: #f1f5f9;
+  display: block;
+  flex: 1 1 auto;
+  min-block-size: 0;
+  min-inline-size: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--planner-scrollbar-thumb) var(--planner-scrollbar-track);
+  container-type: scroll-state;
+  padding-inline-end: 4px;
+  border-radius: 12px;
+}
+
+.session-planner__week-sessions-scroll:focus-visible {
+  outline: 2px solid #ea580c;
+  outline-offset: 2px;
+}
+
+.session-planner__week-sessions-scroll::before,
+.session-planner__week-sessions-scroll::after {
+  content: "";
+  display: block;
+  position: sticky;
+  z-index: 2;
+  block-size: 0.75rem;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.session-planner__week-sessions-scroll::before {
+  inset-block-start: 0;
+  margin-block-end: -0.75rem;
+  background: radial-gradient(farthest-side at 50% 0, rgb(15 23 42 / 0.14), transparent);
+}
+
+.session-planner__week-sessions-scroll::after {
+  inset-block-end: 0;
+  margin-block-start: -0.75rem;
+  background: radial-gradient(farthest-side at 50% 100%, rgb(15 23 42 / 0.14), transparent);
+}
+
+@container scroll-state(scrollable: block-start) {
+  .session-planner__week-sessions-scroll::before {
+    opacity: 1;
+  }
+}
+
+@container scroll-state(scrollable: block-end) {
+  .session-planner__week-sessions-scroll::after {
+    opacity: 1;
+  }
+}
+
+@supports not (container-type: scroll-state) {
+  @keyframes planner-scroll-start-hint {
+    0% {
+      opacity: 0;
+    }
+    3%,
+    100% {
+      opacity: 1;
+    }
+  }
+
+  @keyframes planner-scroll-end-hint {
+    0%,
+    97% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+
+  .session-planner__week-sessions-scroll::before,
+  .session-planner__week-sessions-scroll::after {
+    animation-timeline: scroll();
+    animation-fill-mode: both;
+  }
+
+  .session-planner__week-sessions-scroll::before {
+    animation-name: planner-scroll-start-hint;
+  }
+
+  .session-planner__week-sessions-scroll::after {
+    animation-name: planner-scroll-end-hint;
+  }
+}
+
+@supports not (scrollbar-color: auto) {
+  .session-planner__week-sessions-scroll::-webkit-scrollbar {
+    inline-size: 8px;
+  }
+
+  .session-planner__week-sessions-scroll::-webkit-scrollbar-track {
+    background: var(--planner-scrollbar-track);
+    border-radius: 999px;
+  }
+
+  .session-planner__week-sessions-scroll::-webkit-scrollbar-thumb {
+    background: var(--planner-scrollbar-thumb);
+    border-radius: 999px;
+    border: 2px solid var(--planner-scrollbar-track);
+  }
+
+  .session-planner__week-sessions-scroll::-webkit-scrollbar-thumb:hover {
+    background: var(--planner-scrollbar-thumb-hover);
+  }
+}
+
 .session-planner__week-sessions-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .week-session-card {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 16px 18px;
-  border-radius: 14px;
+  gap: 8px;
+  padding: 13px 15px;
+  border-radius: 12px;
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-left: 3.5px solid #cbd5e1;
@@ -917,7 +1192,7 @@
 }
 
 .week-session-card.is-planned {
-  border-left-color: #ea580c;
+  border-left-color: #94a3b8;
 }
 
 .week-session-card__top {
@@ -983,8 +1258,8 @@
 .week-session-card__blocks {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 11px 13px;
+  gap: 5px;
+  padding: 9px 11px;
   border-radius: 10px;
   background: #f8fafc;
   border: 1px solid #f1f5f9;
@@ -997,28 +1272,28 @@
 }
 
 .week-session-block + .week-session-block {
-  padding-top: 6px;
+  padding-top: 5px;
   border-top: 1px dashed #e2e8f0;
 }
 
 .week-session-block__title {
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 700;
   color: #1e293b;
 }
 
 .week-session-block__desc {
   margin: 0;
-  font-size: 13.5px;
+  font-size: 13px;
   color: #475569;
-  line-height: 1.5;
+  line-height: 1.45;
   white-space: pre-line;
   word-break: break-word;
 }
 
 .week-session-block__desc.is-clamped {
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -1152,6 +1427,284 @@
   color: #64748b;
 }
 
+.session-planner__metrics-fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.session-planner__metrics-legend {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.session-planner__new-metric-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 11px;
+  border-radius: 8px;
+  border: 1px solid #fed7aa;
+  background: #fff7ed;
+  color: #ea580c;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.session-planner__new-metric-btn:hover {
+  background: #ffedd5;
+}
+
+.session-planner__metrics-hint {
+  margin: 0;
+  font-size: 13.5px;
+  color: #64748b;
+}
+
+.session-planner__metrics-error {
+  margin: 0;
+  font-size: 13.5px;
+  color: #b91c1c;
+}
+
+.session-planner__metrics-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  font-size: 14px;
+  color: #475569;
+}
+
+.session-planner__metrics-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.session-planner__metrics-search {
+  flex: 1 1 200px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  font-size: 13.5px;
+  font-family: inherit;
+  color: #0f172a;
+}
+
+.session-planner__metrics-search:focus {
+  outline: 2px solid #fb923c;
+  border-color: #ea580c;
+}
+
+.session-planner__metrics-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.session-planner__quick-metric-btn {
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.session-planner__quick-metric-btn:hover {
+  border-color: #fb923c;
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.session-planner__quick-metric-btn.is-clear {
+  color: #b91c1c;
+}
+
+.session-planner__metrics-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.session-planner__metric-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.session-planner__metric-option:hover {
+  border-color: #fdba74;
+  background: #fffaf5;
+}
+
+.session-planner__metric-option.is-selected {
+  border-color: #ea580c;
+  background: #fff7ed;
+}
+
+.session-planner__metric-option input[type="checkbox"] {
+  margin-top: 3px;
+  accent-color: #ea580c;
+  flex-shrink: 0;
+}
+
+.metric-option__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.metric-option__info strong {
+  font-size: 13.5px;
+  color: #0f172a;
+}
+
+.metric-option__info small {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.session-planner__card-head-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.session-planner__dup-week-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border-radius: 8px;
+  border: 1px solid #fed7aa;
+  background: #fff7ed;
+  color: #c2410c;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.session-planner__dup-week-btn:hover:not(:disabled) {
+  background: #ffedd5;
+  border-color: #fb923c;
+}
+
+.session-planner__dup-week-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.week-session-card__metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.week-session-metric-pill {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.week-session-metric-more {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.week-session-metric-empty {
+  font-size: 12.5px;
+  color: #64748b;
+  font-style: italic;
+}
+
+.session-planner__dup-modal-note {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #475569;
+}
+
+.session-planner__dup-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.session-planner__dup-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.session-planner__dup-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.session-planner__dup-field label {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.session-planner__dup-field input {
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  font-size: 14px;
+  font-family: inherit;
+  color: #0f172a;
+}
+
+.session-planner__dup-field input:focus {
+  outline: 2px solid #fb923c;
+  border-color: #ea580c;
+}
+
 .session-planner__muted {
   font-size: 14.5px;
   color: #64748b;
@@ -1160,8 +1713,9 @@
 
 .session-planner__info-box {
   display: flex;
-  gap: 12px;
-  padding: 16px;
+  flex-shrink: 0;
+  gap: 10px;
+  padding: 13px 15px;
   background: #eff6ff;
   border: 1px solid #bfdbfe;
   border-radius: 14px;
@@ -1170,13 +1724,13 @@
 
 .session-planner__info-box strong {
   display: block;
-  font-size: 15px;
-  margin-bottom: 4px;
+  font-size: 14px;
+  margin-bottom: 3px;
 }
 
 .session-planner__info-box p {
-  font-size: 13.5px;
-  line-height: 1.5;
+  font-size: 12.5px;
+  line-height: 1.45;
   margin: 0;
   color: #1d4ed8;
 }
@@ -1184,6 +1738,15 @@
 @media (max-width: 1060px) {
   .session-planner__grid {
     grid-template-columns: 1fr;
+  }
+
+  .session-planner__grid.is-composer-active > .session-planner__right-col {
+    block-size: auto;
+    min-block-size: 0;
+  }
+
+  .session-planner__week-panel {
+    max-block-size: min(640px, 75dvh);
   }
 
   .session-planner__form-row,

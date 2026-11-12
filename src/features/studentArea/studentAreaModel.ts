@@ -7,6 +7,9 @@ import type {
   StudentWeekDaySummary,
   StudentWorkoutSession,
 } from "../../types/studentArea";
+import type { PlanejamentoSemanaDTO, RotinaResponse } from "../../types/rotina";
+import type { StudentActiveRoutineInfo } from "./StudentContext";
+import { parseAtividades } from "../../utils/activityParser";
 
 export interface BorgLevelInfo {
   level: number;
@@ -131,6 +134,19 @@ export function formatLoginToast(message: string): { title: string; message: str
   };
 }
 
+export function sportKeyFromName(name?: string | null): string {
+  const raw = (name || "").trim();
+  if (!raw) return "natacao";
+  const norm = normalizeText(raw);
+  if (norm.includes("tenis")) return "tenis";
+  if (norm.includes("corr")) return "corrida";
+  if (norm.includes("acad") || norm.includes("musc")) return "academia";
+  if (norm.includes("cicl")) return "ciclismo";
+  if (norm.includes("func")) return "funcional";
+  if (norm.includes("natac")) return "natacao";
+  return raw;
+}
+
 export function filterStudentSessions(
   sessions: StudentWorkoutSession[],
   query: string
@@ -139,7 +155,7 @@ export function filterStudentSessions(
   if (!q) return sessions;
   return sessions.filter((s) => {
     const target = normalizeText(
-      `${s.titulo} ${s.descricao} ${s.diaSemana} ${s.dataPlanejada} ${s.status}`
+      `${s.titulo} ${s.descricao} ${s.diaSemana} ${s.dataPlanejada} ${s.status} ${s.modalidadeNome || ""} ${s.rotinaTitulo || ""}`
     );
     return target.includes(q);
   });
@@ -218,6 +234,260 @@ export function formatDataPlanejadaDdMm(isoDateStr?: string | null): string {
     return `${parts[2]}/${parts[1]}`;
   }
   return isoDateStr;
+}
+
+function parseIsoCalendarUtc(isoDateStr?: string | null): Date | null {
+  if (!isoDateStr) return null;
+  const parts = isoDateStr.slice(0, 10).split("-").map(Number);
+  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return null;
+  const [y, m, d] = parts;
+  return new Date(Date.UTC(y, m - 1, d));
+}
+
+function toIsoCalendarUtc(date: Date): string {
+  const y = date.getUTCFullYear();
+  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(date.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+export function getMondayIso(isoDateStr: string): string {
+  const utc = parseIsoCalendarUtc(isoDateStr);
+  if (!utc) return isoDateStr;
+  const dayOffset = (utc.getUTCDay() + 6) % 7;
+  utc.setUTCDate(utc.getUTCDate() - dayOffset);
+  return toIsoCalendarUtc(utc);
+}
+
+export function addDaysIso(isoDateStr: string, days: number): string {
+  const utc = parseIsoCalendarUtc(isoDateStr);
+  if (!utc) return isoDateStr;
+  utc.setUTCDate(utc.getUTCDate() + days);
+  return toIsoCalendarUtc(utc);
+}
+
+export function mapPlanningToWeeks(
+  rotina: RotinaResponse,
+  semanasBackend: PlanejamentoSemanaDTO[]
+): {
+  info: StudentActiveRoutineInfo;
+  weeks: StudentRoutineWeek[];
+  currentWeekNum: number;
+} {
+  let numSemanaAtual = 1;
+  if (semanasBackend.length > 0) {
+    const semanaComPendente = semanasBackend.find((sem) =>
+      (sem.sessoes || []).some(
+        (s) =>
+          !s.concluidaAluno &&
+          !s.validadaPersonal &&
+          s.status !== "CONCLUIDA" &&
+          s.status !== "VALIDADA"
+      )
+    );
+    numSemanaAtual = semanaComPendente
+      ? semanaComPendente.numeroSemana
+      : semanasBackend[semanasBackend.length - 1].numeroSemana;
+  }
+
+  const info: StudentActiveRoutineInfo = {
+    id: rotina.id,
+    titulo: rotina.titulo,
+    modalidade: rotina.nomeModalidade || rotina.modalidade?.nome || "Treino",
+    modalidadeId: rotina.modalidadeId ?? rotina.modalidade?.id,
+    frequenciaSemanal: rotina.frequenciaSemanal || 3,
+    objetivos: rotina.objetivos || "Desenvolver resistência e capacidade física.",
+    totalSemanas: Math.max(semanasBackend.length, numSemanaAtual),
+    semanaAtual: numSemanaAtual,
+    metricas: (rotina.metricas || []).map((m) => ({
+      id: m.id,
+      titulo: m.titulo,
+      tipo: m.tipo,
+      obrigatoria: Boolean(m.obrigatoria),
+      quemPreenche: m.quemPreenche || "ALUNO",
+    })),
+  };
+
+  let highlightAssigned = false;
+  const weeks: StudentRoutineWeek[] = semanasBackend.map((sem) => {
+    const isAtual = sem.numeroSemana === numSemanaAtual;
+    const isAnterior = sem.numeroSemana < numSemanaAtual;
+    const estado: "anterior" | "atual" | "bloqueada" = isAtual
+      ? "atual"
+      : isAnterior
+      ? "anterior"
+      : "bloqueada";
+
+    const sessoes: StudentWorkoutSession[] = (sem.sessoes || []).map((s, idx) => {
+      const status = (s.validadaPersonal || s.status === "VALIDADA"
+        ? "VALIDADA"
+        : s.concluidaAluno || s.status === "CONCLUIDA"
+        ? "CONCLUIDA"
+        : "PLANEJADA") as "PLANEJADA" | "CONCLUIDA" | "VALIDADA";
+
+      let destaque = false;
+      if (isAtual && status === "PLANEJADA" && !highlightAssigned) {
+        destaque = true;
+        highlightAssigned = true;
+      }
+
+      const diaSemana = formatDiaSemanaPt(s.dataPlanejada);
+      const dataDdMm = formatDataPlanejadaDdMm(s.dataPlanejada);
+      const rpe = s.desempenho?.nivelCansaco ?? null;
+      const parsed = parseAtividades(s.atividades);
+      const headline = parsed.sessionName || parsed.activities[0]?.title || "";
+
+      return {
+        id: s.id,
+        numero: idx + 1,
+        semana: sem.numeroSemana,
+        diaSemana,
+        dataPlanejada: dataDdMm,
+        dataPlanejadaIso: s.dataPlanejada,
+        titulo: headline ? `Sessão ${idx + 1} · ${headline}` : `Sessão ${idx + 1}`,
+        descricao: s.atividades || "Sem descrição informada.",
+        duracaoPlanejada: s.duracao || 50,
+        duracaoReal: s.duracao,
+        dataReal: s.dataReal ? formatDataPlanejadaDdMm(s.dataReal) : null,
+        status,
+        destaque,
+        rpe,
+        rotinaTreinoId: info.id,
+        rotinaTitulo: info.titulo,
+        modalidadeId: info.modalidadeId,
+        modalidadeNome: info.modalidade,
+        metricas: (s.metricas || []).map((m) => ({
+          id: m.id,
+          titulo: m.titulo,
+          tipo: m.tipo,
+          obrigatoria: Boolean(m.obrigatoria),
+          quemPreenche: (m.quemPreenche || "ALUNO") as "PERSONAL" | "ALUNO" | "AMBOS",
+          campoStrava: m.campoStrava,
+        })),
+        resultados: (s.desempenho?.metricas || []).map((m) => ({
+          metricaId: m.metricaId,
+          titulo: m.titulo || m.tituloMetrica || "Métrica",
+          tipo: m.tipo || m.tipoMetrica || "NUMERICO",
+          valor: m.valor,
+        })),
+      };
+    });
+
+    return {
+      numero: sem.numeroSemana,
+      titulo: `Semana ${sem.numeroSemana}`,
+      periodo: isAtual ? "Semana atual" : isAnterior ? "anterior" : "bloqueada",
+      estado,
+      sessoes,
+    };
+  });
+
+  return { info, weeks, currentWeekNum: numSemanaAtual };
+}
+
+/**
+ * Agrupa sessões de múltiplas rotinas ativas por semanas civis reais (segunda a domingo)
+ * com numeração sequencial e fallback automático da semana "atual".
+ */
+export function buildUnifiedCalendarWeeks(
+  routinesData: Array<{ routine: StudentActiveRoutineInfo; weeks: StudentRoutineWeek[] }>,
+  referenceIsoDate?: string
+): StudentRoutineWeek[] {
+  const buckets = new Map<string, StudentWorkoutSession[]>();
+
+  for (const entry of routinesData) {
+    for (const week of entry.weeks) {
+      for (const session of week.sessoes) {
+        const key = session.dataPlanejadaIso
+          ? getMondayIso(session.dataPlanejadaIso)
+          : `sem-${String(week.numero).padStart(4, "0")}`;
+        const list = buckets.get(key) || [];
+        list.push({
+          ...session,
+          rotinaTreinoId: session.rotinaTreinoId ?? entry.routine.id,
+          rotinaTitulo: session.rotinaTitulo ?? entry.routine.titulo,
+          modalidadeId: session.modalidadeId ?? entry.routine.modalidadeId,
+          modalidadeNome: session.modalidadeNome ?? entry.routine.modalidade,
+        });
+        buckets.set(key, list);
+      }
+    }
+  }
+
+  const sortedKeys = [...buckets.keys()].sort((a, b) => a.localeCompare(b));
+  if (sortedKeys.length === 0) return [];
+
+  const todayIso =
+    referenceIsoDate ||
+    new Date().toLocaleDateString("sv-SE");
+  const todayMondayIso = getMondayIso(todayIso);
+
+  let currentKey = sortedKeys.find((key) => key === todayMondayIso);
+  if (!currentKey) {
+    const firstPendingKey = sortedKeys.find((key) => {
+      if (key < todayMondayIso) return false;
+      return (buckets.get(key) || []).some((s) => s.status === "PLANEJADA");
+    });
+    const earliestFutureOrCurrent = sortedKeys.find((key) => key >= todayMondayIso);
+    const latestPendingPast = [...sortedKeys]
+      .reverse()
+      .find((key) => (buckets.get(key) || []).some((s) => s.status === "PLANEJADA"));
+    currentKey =
+      firstPendingKey ??
+      earliestFutureOrCurrent ??
+      latestPendingPast ??
+      sortedKeys[sortedKeys.length - 1];
+  }
+
+  let highlightAssigned = false;
+
+  return sortedKeys.map((key, idx) => {
+    const isAtual = key === currentKey;
+    const isAnterior = key < currentKey;
+    const estado: "anterior" | "atual" | "bloqueada" = isAtual
+      ? "atual"
+      : isAnterior
+      ? "anterior"
+      : "bloqueada";
+
+    const rawSessions = buckets.get(key) || [];
+    const sortedSessions = [...rawSessions].sort((a, b) => {
+      const dateCmp = (a.dataPlanejadaIso || "").localeCompare(b.dataPlanejadaIso || "");
+      if (dateCmp !== 0) return dateCmp;
+      const modCmp = (a.modalidadeNome || "").localeCompare(b.modalidadeNome || "", "pt-BR");
+      if (modCmp !== 0) return modCmp;
+      return a.numero - b.numero;
+    });
+
+    const sessoes = sortedSessions.map((s) => {
+      let destaque = false;
+      if (isAtual && s.status === "PLANEJADA" && !highlightAssigned) {
+        destaque = true;
+        highlightAssigned = true;
+      }
+      return {
+        ...s,
+        destaque,
+      };
+    });
+
+    const isIsoWeek = /^\d{4}-\d{2}-\d{2}$/.test(key);
+    const dateRange = isIsoWeek
+      ? `${formatDataPlanejadaDdMm(key)} – ${formatDataPlanejadaDdMm(addDaysIso(key, 6))}`
+      : isAtual
+      ? "Semana atual"
+      : isAnterior
+      ? "anterior"
+      : "bloqueada";
+
+    return {
+      numero: idx + 1,
+      titulo: `Semana ${idx + 1}`,
+      periodo: isIsoWeek && isAtual ? `${dateRange} · atual` : dateRange,
+      estado,
+      sessoes,
+    };
+  });
 }
 
 

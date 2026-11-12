@@ -170,7 +170,7 @@ export default function StudentEvolutionPage() {
             Dados de evolução em construção
           </h3>
           <p style={{ color: "var(--color-neutral-500, #64748b)", maxWidth: "480px", margin: "0 auto", fontSize: "0.875rem" }}>
-            Conforme os requisitos da plataforma (US-15 C1), são necessárias ao menos <strong>3 sessões de treino concluídas</strong> com métricas ou RPE registrados para traçar as curvas de evolução.
+            São necessárias ao menos <strong>3 sessões de treino concluídas</strong> com métricas ou RPE registrados para traçar as curvas de evolução.
           </p>
         </div>
       )}

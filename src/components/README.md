@@ -1,10 +1,11 @@
-# Componentes · Gymnasion v2
+# Components
+
+## Overview
+UI components, workspace navigation bars, modals, and design system primitives for Gymnasion Web. Each component directory colocates its `.tsx` implementation and `.css` stylesheet consuming tokens from `src/styles/tokens.css`.
 
 Referência: [Componentes no Figma](https://www.figma.com/design/Kw1G5FRZa0zVp2UBwC3kXK/Prototipo---Projeto-de-Software?node-id=396-45).
 
-Abra `/design-system` no servidor de desenvolvimento para validar as variantes e interações. Essa rota não é registrada em produção. Os nomes e ações da galeria são exemplos locais, sem chamadas à API.
-
-Cada componente mantém seu TSX e CSS na própria pasta e consome os tokens de `src/styles/tokens.css`.
+Abra `/design-system` no servidor de desenvolvimento (`import.meta.env.DEV`) para validar as variantes e interações. Os SVGs oficiais residem em `public/design-system`.
 
 | Componente | API principal |
 | --- | --- |
@@ -18,21 +19,13 @@ Cada componente mantém seu TSX e CSS na própria pasta e consome os tokens de `
 | Toast | `tone`: success, error, info; `title`, `message`, `onClose` |
 | AppSidebar | `role`, `user`, `menu`, `general`, `footer`, `onLogout` |
 | SidebarCallout | `variant="strava"` ou `variant="personal"`, com `onAction` |
-| AppTopbar | título, subtítulo, usuário, `onSearch` e `onNotifications` |
+| AppTopbar | `title`, `subtitle`, `userName`, `userInitials`, `onSearch` e `onNotifications` |
 
-Button e FormField evoluem os componentes existentes e preservam os atributos usados pelas telas. As páginas antigas ainda podem sobrescrever estilos; sua migração visual será feita por tela.
-
-## Integração
-
-AppSidebar aceita itens com `to` (NavLink com estado ativo automático) ou `onClick` (ação com `activeId`). Um item sem destino/ação fica desabilitado. Passe apenas rotas existentes. Dados de usuário, contagens e ações devem vir da página e dos serviços, nunca do componente.
-
-AppTopbar envia a busca ao pressionar Enter; Ctrl/Command + K foca o campo. Toast é uma apresentação controlada: a página decide quando mostrar/remover ou conectar ao gerenciador de notificações.
-
-Os SVGs oficiais foram baixados para `public/design-system`. Manter suas dimensões intrínsecas (logo 40px, navegação 20px, modalidades 14px) e não usar URLs temporárias do Figma. O mapa visual pode ser consultado nos componentes; os nomes dos arquivos correspondem às constantes exportadas pelo Figma.
-
-## Validação desta etapa
-
-- Build TypeScript/Vite e ESLint dos componentes.
-- Conferência visual dos SVGs e dimensões no navegador.
-- Checkbox controlado, seleção de modalidade, mostrar/ocultar senha.
-- Botões de exemplo, navegação ativa, busca e fechamento de notificações.
+## Subdirectories & Boundaries
+- AppTopbar: [./AppTopbar/README.md](./AppTopbar/README.md) — Topbar do workspace autenticado com busca global (`Ctrl+K`/`Meta+K`), gatilho de notificações e avatar do usuário.
+- Checkbox: [./Checkbox/README.md](./Checkbox/README.md) — Primitiva de seleção (`forwardRef<HTMLInputElement>`) com geração automática de `id` via `useId()`.
+- NotificationPopover: [./NotificationPopover/README.md](./NotificationPopover/README.md) — Popover acessível de notificações com abas (`Todas`, `Não lidas`, `Pendências`) e marcação de leitura individual ou em lote.
+- ProfileRoutineCard: [./ProfileRoutineCard/README.md](./ProfileRoutineCard/README.md) — Card de resumo de rotina de treino no perfil do aluno com chips simplificados de métricas e grade semanal de referência.
+- ProfileSessions: [./ProfileSessions/README.md](./ProfileSessions/README.md) — Tabela paginada e filtros de sessões de treino do aluno nos modos Visão Geral (`recent`) e Histórico completo.
+- Sports: [./Sports/README.md](./Sports/README.md) — Seção institucional de modalidades suportadas com imagens responsivas `<picture>`.
+- Additional component directories (`About`, `AccountSidebar`, `AppSidebar`, `AuthCaptcha`, `AuthLayout`, `Avatar`, `Badge`, `Benefits`, `Button`, `DashboardEvolution`, `DashboardNotifications`, `DashboardPanel`, `DashboardStats`, `Footer`, `FormField`, `GroupAddStudentModal`, `GroupCard`, `GroupConfirmModal`, `GroupDataForm`, `GroupFormModal`, `GroupRoutineModal`, `GroupToolbar`, `GroupsEmptyState`, `Hero`, `Highlights`, `HomeNavigation`, `HomeOverview`, `HowItWorks`, `InstitutionalNavbar`, `InviteEmail`, `InviteLink`, `InviteResult`, `Logo`, `MetricCard`, `MetricCreateModal`, `MetricDialog`, `MetricForm`, `MetricModal`, `MissedWorkoutRow`, `MissedWorkouts`, `Navbar`, `NotificationItem`, `Notifications`, `PasswordRules`, `PendingStudent`, `PersonalLayout`, `PlatformHeader`, `ProtectedRoute`, `PublicOnlyRoute`, `RecentStudentRow`, `RecentStudents`, `ReportDialog`, `RoutineAssignModal`, `RoutineCard`, `RoutineDeleteModal`, `RoutineFormModal`, `RoutineReuseModal`, `RoutineStatusDialog`, `RoutinesEmptyState`, `SessionAuditModal`, `SessionCorrectionModal`, `SessionRegisterDialog`, `SettingsSection`, `SidebarCallout`, `SportTag`, `StravaModal`, `StudentActionModal`, `StudentCard`, `StudentEvolution`, `StudentIdentity`, `StudentInviteModal`, `StudentLayout`, `StudentRoutineDialog`, `StudentRpeModal`, `StudentSmoothChart`, `StudentStatusDialog`, `StudentToast`, `StudentToolbar`, `StudentsEmptyState`, `Subscription`, `TermsModal`, `Toast`, `UnavailableAction`, `ValidateSessionModal`, `WorkspaceDialog`).
