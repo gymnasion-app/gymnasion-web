@@ -5,6 +5,7 @@ import toast, { Toaster } from "react-hot-toast";
 import PasswordRecovery from "./pages/PasswordRecovery/PasswordRecovery";
 import SignIn from "./pages/SignIn/SignIn";
 import Home from "./pages/Home/Home";
+import Conheca from "./pages/Conheca/Conheca";
 import SignUp from "./pages/SignUp/SignUp";
 import Students from "./pages/Students/Students";
 import StudentProfile from "./pages/StudentProfile/StudentProfile";
@@ -56,6 +57,7 @@ function App() {
       <Routes>
         {import.meta.env.DEV && <Route path="/design-system" element={<DesignSystem />} />}
         <Route path="/" element={<Home />} />
+        <Route path="/conheca" element={<Conheca />} />
         <Route path="/recuperar-senha" element={<PasswordRecovery />} />
         <Route path="/cadastro-aluno" element={<SignUpStudent />} />
         <Route path="/strava/callback" element={<StravaCallbackPage />} />

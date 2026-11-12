@@ -1,7 +1,7 @@
-import { useState, type ChangeEvent, type FormEvent } from "react";
+import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { useNavigate, useLocation, Link, useSearchParams } from "react-router-dom";
 import AuthLayout from "../../components/AuthLayout/AuthLayout";
-import AuthCaptcha from "../../components/AuthCaptcha/AuthCaptcha";
+import AuthCaptcha, { type AuthCaptchaHandle } from "../../components/AuthCaptcha/AuthCaptcha";
 import Button from "../../components/Button/Button";
 import FormField from "../../components/FormField/FormField";
 import Checkbox from "../../components/Checkbox/Checkbox";
@@ -30,6 +30,8 @@ export default function SignIn() {
   const [remember, setRemember] = useState(Boolean(rememberedEmail && !initialSuspended));
   const [error, setError] = useState(initialSuspended ? "O seu acesso encontra-se suspenso. Entre em contato com seu personal." : "");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captchaRef = useRef<AuthCaptchaHandle>(null);
   const errors: Partial<Record<keyof Credentials, string>> = {};
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email.trim())) errors.email = "Insira um e-mail válido.";
   if (!values.password) errors.password = "Preencha a senha.";
@@ -66,14 +68,17 @@ export default function SignIn() {
       if (field instanceof HTMLElement) field.focus();
       return;
     }
+    if (!captchaToken) return;
     setIsSubmitting(true);
     try {
-      const { role } = await authService.login({ email: values.email.trim().toLowerCase(), password: values.password }, remember);
+      const { role } = await authService.login({ email: values.email.trim().toLowerCase(), password: values.password, captchaToken }, remember);
       const from = routeState?.from;
       const canUseFrom = from && from.startsWith("/") && !from.startsWith("//") && (role === "PERSONAL_TRAINER" ? !from.startsWith("/conta") : from.startsWith("/conta"));
       navigate(canUseFrom ? from : homeForRole(role), { replace: true });
     } catch (err) {
       setError(authError(err, "E-mail ou senha inválidos.").message);
+      // O token do reCAPTCHA vale uma única vez: exige nova verificação
+      captchaRef.current?.reset();
     } finally {
       setIsSubmitting(false);
     }
@@ -89,8 +94,8 @@ export default function SignIn() {
       <FormField id="signin-email" name="email" {...fieldProps("email")} label="E-mail" type="email" autoComplete="username" placeholder="seu@email.com" required />
       <FormField id="signin-password" name="password" {...fieldProps("password")} label="Senha" type="password" autoComplete="current-password" placeholder="Digite sua senha" required />
       <div className="signin-form__options"><Checkbox id="signin-remember" name="remember" label="Lembrar de mim" checked={remember} onChange={handleRememberChange} disabled={isSubmitting} /><Link className="auth-form__link" to="/recuperar-senha">Esqueci minha senha</Link></div>
-      <AuthCaptcha />
-      <Button type="submit" className="auth-form__submit" loading={isSubmitting}>{isSubmitting ? "Entrando..." : "Entrar"}</Button>
+      <AuthCaptcha ref={captchaRef} onChange={setCaptchaToken} />
+      <Button type="submit" className="auth-form__submit" loading={isSubmitting} disabled={!captchaToken}>{isSubmitting ? "Entrando..." : "Entrar"}</Button>
       <div className="signin-form__divider"><span>ou</span></div>
       <p className="auth-form__switch">Ainda não tem conta? <Link className="auth-form__link" to="/cadastro">Cadastre-se grátis</Link></p>
     </form>

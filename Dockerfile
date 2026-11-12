@@ -10,6 +10,9 @@ COPY . .
 # "/" = mesma origem: o nginx encaminha /api para o back-end
 ARG VITE_API_URL=/
 ENV VITE_API_URL=$VITE_API_URL
+# Chave PÚBLICA do Google reCAPTCHA v2 (embutida no bundle pelo Vite; não é segredo)
+ARG VITE_RECAPTCHA_SITE_KEY
+ENV VITE_RECAPTCHA_SITE_KEY=$VITE_RECAPTCHA_SITE_KEY
 RUN npm run build
 
 # Estágio 2: Runtime (nginx servindo os arquivos estáticos)

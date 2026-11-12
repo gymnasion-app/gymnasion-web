@@ -1,7 +1,7 @@
-import { useState, useEffect, type FormEvent, type ChangeEvent } from "react";
+import { useRef, useState, useEffect, type FormEvent, type ChangeEvent } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import AuthLayout from "../../components/AuthLayout/AuthLayout";
-import AuthCaptcha from "../../components/AuthCaptcha/AuthCaptcha";
+import AuthCaptcha, { type AuthCaptchaHandle } from "../../components/AuthCaptcha/AuthCaptcha";
 import PasswordRules from "../../components/PasswordRules/PasswordRules";
 import TermsModal from "../../components/TermsModal/TermsModal";
 import Toast from "../../components/Toast/Toast";
@@ -32,6 +32,8 @@ export default function SignUp() {
   const [modalityError, setModalityError] = useState("");
   const [retry, setRetry] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captchaRef = useRef<AuthCaptchaHandle>(null);
   const errors = validateSignUp(values);
 
   useEffect(() => {
@@ -83,20 +85,21 @@ export default function SignUp() {
       if (field instanceof HTMLElement) field.focus();
       return;
     }
-    if (loadingModalities || modalityError) return;
+    if (loadingModalities || modalityError || !captchaToken) return;
     setIsSubmitting(true);
     try {
       await authService.registroPersonal({
         nome: values.name.trim(), email: values.email.trim().toLowerCase(),
         password: values.password, cpf: values.cpf.replace(/\D/g, ""),
         celular: values.phone.replace(/\D/g, ""), modalidade: Number(values.modality),
-        aceitouTermos: true,
+        aceitouTermos: true, captchaToken,
       });
       navigate("/login", { replace: true, state: { registered: true, email: values.email.trim().toLowerCase() } });
     } catch (err) {
       const result = authError(err, "Não foi possível realizar o cadastro.");
       setNotice(result.message);
       setServerErrors(result.fields);
+      captchaRef.current?.reset();
     } finally {
       setIsSubmitting(false);
     }
@@ -117,13 +120,13 @@ export default function SignUp() {
       </div>
       {modalityError && <div className="auth-form__error" role="alert">{modalityError} <button type="button" className="auth-form__link" onClick={() => setRetry(value => value + 1)}>Tentar novamente</button></div>}
       <PasswordRules password={values.password} />
-      <AuthCaptcha />
+      <AuthCaptcha ref={captchaRef} onChange={setCaptchaToken} />
       <div className={`personal-signup__terms${submitted && !accepted ? " personal-signup__terms--invalid" : ""}`}>
         <Checkbox name="terms" label="Li e aceito os" checked={accepted} onChange={event => setAccepted(event.target.checked)} aria-invalid={submitted && !accepted || undefined} aria-describedby={submitted && !accepted ? "terms-error" : undefined} disabled={isSubmitting} />
         <button type="button" className="auth-form__link" onClick={() => setTermsOpen(true)}>Termos de Uso e Política de Privacidade</button>
       </div>
       {submitted && !accepted && <p className="personal-signup__terms-error" id="terms-error" role="alert">Aceite os termos para continuar.</p>}
-      <Button type="submit" className="auth-form__submit" loading={isSubmitting} disabled={loadingModalities || Boolean(modalityError)}>{isSubmitting ? "Cadastrando..." : "Finalizar cadastro"}</Button>
+      <Button type="submit" className="auth-form__submit" loading={isSubmitting} disabled={loadingModalities || Boolean(modalityError) || !captchaToken}>{isSubmitting ? "Cadastrando..." : "Finalizar cadastro"}</Button>
       <p className="auth-form__switch">Já tem uma conta? <Link className="auth-form__link" to="/login">Entrar</Link></p>
     </form>
     {termsOpen && <TermsModal onClose={() => setTermsOpen(false)} onAccept={() => { setAccepted(true); setTermsOpen(false); setNotice(""); }} />}

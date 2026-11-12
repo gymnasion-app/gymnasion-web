@@ -4,7 +4,7 @@ import type { LoginPayload, LoginResponse, SignUpPersonalPayload, SignUpPersonal
 
 export const authService = {
   async login(payload: LoginPayload, remember = false): Promise<LoginResponse> {
-    const { data } = await api.post<LoginResponse>("/api/auth/login", payload);
+    const { data } = await api.post<LoginResponse>("/api/auth/login-web", payload);
 
     session.save(data, remember, payload.email);
 

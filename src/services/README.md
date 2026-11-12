@@ -48,7 +48,7 @@ HTTP client layer, JWT session state management, and domain API service modules 
 - `[session.ts:session.clear]` — Removes `'@Gymnasion:token'` and `'@Gymnasion:user'` from both `localStorage` and `sessionStorage`.
 - `[session.ts:session.clearRememberedEmail]` — Removes `'@Gymnasion:remembered_email'` from `localStorage`.
 - `[session.ts:session.getToken]` — Reads from `sessionStorage`/`localStorage` and calls `session.clear()` as a side effect if the stored token is expired.
-- `[authService.ts:authService.login]` — Performs `POST '/api/auth/login'` and persists session state via `session.save()`.
+- `[authService.ts:authService.login]` — Performs `POST '/api/auth/login-web'` (reCAPTCHA token required) and persists session state via `session.save()`.
 - `[authService.ts:authService.logout]` — Clears persisted session state via `session.clear()`.
 - `[accountService.ts:accountService]`, `[alunoService.ts:alunoService]`, `[metricaService.ts:metricaService]`, `[modalidadeService.ts:modalidadeService]`, `[personalDashboardService.ts:personalDashboardService]`, `[personalTrainerService.ts:personalTrainerService]`, `[relatorioService.ts:relatorioService]`, `[rotinaService.ts:rotinaService]`, `[sessionDetailService.ts:sessionDetailService]`, `[stravaService.ts:stravaService]`, `[studentProfileService.ts:studentProfileService]`, `[turmaService.ts:turmaService]` — Perform HTTP requests (`GET`, `POST`, `PUT`, `PATCH`, `DELETE`) against the `/api/*` backend endpoints.
 

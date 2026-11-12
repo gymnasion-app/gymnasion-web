@@ -24,6 +24,7 @@ export interface SignUpPersonalPayload {
   celular: string;   
   modalidade: number; 
   aceitouTermos: boolean;
+  captchaToken: string;
 }
 
 export interface SignUpPersonalResponse {
@@ -38,6 +39,7 @@ export interface SignUpPersonalResponse {
 export interface LoginPayload {
   email: string;
   password: string;
+  captchaToken: string;
 }
 
 export type UserRole = "PERSONAL_TRAINER" | "ALUNO" | "ADMIN";

@@ -1,4 +1,6 @@
-.auth-captcha { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 60px; padding: 12px 14px; border: 1px solid var(--color-border); border-radius: var(--radius-control); background: #f9fafb; }
-.auth-captcha > div > small { display: block; margin-top: 3px; color: var(--color-ink-500); font-size: 10px; }
-.auth-captcha > span { display: flex; flex-direction: column; align-items: center; gap: 0; }
-.auth-captcha > span small { font-size: 9px; color: var(--color-ink-400); }
+.auth-captcha { display: flex; justify-content: center; min-height: 78px; }
+.auth-captcha--error { align-items: center; min-height: 60px; padding: 12px 14px; border: 1px solid var(--color-border); border-radius: var(--radius-control); background: #f9fafb; color: var(--color-ink-500); font-size: 12px; text-align: center; }
+/* O widget do Google tem largura fixa de 304px: reduz em telas muito estreitas */
+@media (max-width: 360px) {
+  .auth-captcha > div { transform: scale(0.88); transform-origin: center top; }
+}

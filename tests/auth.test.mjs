@@ -36,7 +36,7 @@ test("student login keeps the session and has a separate authenticated destinati
     "./api": { api: { post: async () => ({ data: response }) } },
     "./session": { session },
   });
-  await authService.login({ email: "student@example.test", password: "test" });
+  await authService.login({ email: "student@example.test", password: "test", captchaToken: "captcha-test" });
   assert.equal(session.getUser().role, "ALUNO");
   assert.equal(session.getToken(), response.token);
   assert.equal(homeForRole("ALUNO"), "/conta");
@@ -88,10 +88,10 @@ test("failed login does not create a session; successful login honors persistenc
     "./session": fixture,
     "./api": { api: { post: async () => { if (fail) throw new Error("Unauthorized"); return { data: response }; } } },
   });
-  await assert.rejects(authService.login({ email: "test@example.invalid", password: "test" }), /Unauthorized/);
+  await assert.rejects(authService.login({ email: "test@example.invalid", password: "test", captchaToken: "captcha-test" }), /Unauthorized/);
   assert.equal(fixture.session.getToken(), null);
   fail = false;
-  await authService.login({ email: "test@example.invalid", password: "test" }, true);
+  await authService.login({ email: "test@example.invalid", password: "test", captchaToken: "captcha-test" }, true);
   assert.equal(fixture.localStorage.getItem("@Gymnasion:token"), response.token);
   assert.equal(fixture.session.getRememberedEmail(), "test@example.invalid");
   authService.logout();
@@ -99,6 +99,18 @@ test("failed login does not create a session; successful login honors persistenc
   assert.equal(fixture.session.getRememberedEmail(), "test@example.invalid");
   fixture.session.clearRememberedEmail();
   assert.equal(fixture.session.getRememberedEmail(), null);
+});
+
+test("web login uses the reCAPTCHA-protected endpoint and sends the token (US-02)", async () => {
+  const fixture = sessionFixture();
+  let request;
+  const { authService } = loadModule("services/authService.ts", {}, {
+    "./session": fixture,
+    "./api": { api: { post: async (...args) => { request = args; return { data: loginResponse() }; } } },
+  });
+  await authService.login({ email: "user@example.com", password: "secret", captchaToken: "captcha-test" });
+  assert.equal(request[0], "/api/auth/login-web");
+  assert.equal(request[1].captchaToken, "captcha-test");
 });
 
 test("remember me stores email and unchecking remember clears it on login", async () => {
@@ -109,10 +121,10 @@ test("remember me stores email and unchecking remember clears it on login", asyn
     "./api": { api: { post: async () => ({ data: response }) } },
   });
 
-  await authService.login({ email: "user@example.com", password: "secret" }, true);
+  await authService.login({ email: "user@example.com", password: "secret", captchaToken: "captcha-test" }, true);
   assert.equal(fixture.session.getRememberedEmail(), "user@example.com");
 
-  await authService.login({ email: "user@example.com", password: "secret" }, false);
+  await authService.login({ email: "user@example.com", password: "secret", captchaToken: "captcha-test" }, false);
   assert.equal(fixture.session.getRememberedEmail(), null);
 });
 
@@ -194,10 +206,11 @@ test("personal registration sends aceitouTermos to satisfy US-17 and RN-013", as
     "./api": { api: { post: async (...args) => { request = args; return { data: response }; } } },
     "./session": { session: {} },
   });
-  const payload = { nome: "Amanda Souza", email: "amanda@example.com", password: "SenhaForte@2026", cpf: "12345678900", celular: "11999999999", modalidade: 1, aceitouTermos: true };
+  const payload = { nome: "Amanda Souza", email: "amanda@example.com", password: "SenhaForte@2026", cpf: "12345678900", celular: "11999999999", modalidade: 1, aceitouTermos: true, captchaToken: "captcha-test" };
   assert.equal(await authService.registroPersonal(payload), response);
   assert.equal(request[0], "/api/auth/registro-personal");
   assert.equal(request[1].aceitouTermos, true);
+  assert.equal(request[1].captchaToken, "captcha-test");
 });
 
 test("invitation generation can include student email for direct dispatch", async () => {
