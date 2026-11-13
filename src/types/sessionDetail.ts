@@ -1,10 +1,12 @@
 // src/types/sessionDetail.ts
-import type { TipoMetrica, ResponsavelPreenchimento } from "./metric";
+import type { CampoStrava, TipoMetrica, ResponsavelPreenchimento } from "./metric";
 
 export interface MetricaDesempenhoDetalhe {
   metricaId: string;
   titulo: string;
   tipo: TipoMetrica;
+  unidade?: string | null;
+  campoStrava?: CampoStrava | null;
   obrigatoria: boolean;
   quemPreenche: ResponsavelPreenchimento;
   ativa: boolean;
@@ -33,6 +35,7 @@ export interface DesempenhoDetalheResponse {
   registradoPor?: string | null;
   dataRegistro?: string | null;
   observacoes?: string | null;
+  stravaAtividadeId?: string | null;
   metricas: MetricaDesempenhoDetalhe[];
 }
 
@@ -40,7 +43,7 @@ export interface AuditoriaDesempenhoItem {
   id: string;
   tipoOperacao: "INCLUSAO" | "CORRECAO";
   tipoAlteracao?: "INCLUSAO" | "CORRECAO";
-  campo: "DATA_REAL" | "OBSERVACOES" | "METRICA";
+  campo: "DATA_REAL" | "DURACAO" | "OBSERVACOES" | "METRICA";
   metricaId?: string | null;
   tituloMetrica?: string | null;
   metricaTitulo?: string | null;
@@ -56,6 +59,7 @@ export interface AuditoriaDesempenhoItem {
 
 export interface CorrigirDesempenhoPayload {
   dataReal?: string | null;
+  duracao?: number | null;
   observacoes?: string | null;
   metricas?: Array<{
     metricaId: string;

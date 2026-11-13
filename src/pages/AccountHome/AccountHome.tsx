@@ -14,27 +14,12 @@ import { STRAVA_STATUS_CHANGED } from "../../features/strava/connectWithPopup";
 import type { StravaStatusResponse } from "../../types/strava";
 import type { StudentExecutionMetricDTO } from "../../types/studentArea";
 import { parseAtividades } from "../../utils/activityParser";
+import { formatDurationMinutes } from "../../utils/durationFormat";
+import {
+  parseMetricNumericValue,
+  stripDuplicateUnitSuffix,
+} from "../../utils/metricValueFormat";
 import "./AccountHome.css";
-
-function parseMetricNumericValue(raw: string): number | null {
-  const trimmed = raw.trim();
-  // Tempo hh:mm:ss -> segundos
-  const hmsMatch = /^(\d+):([0-5]\d):([0-5]\d)$/.exec(trimmed);
-  if (hmsMatch) {
-    return Number(hmsMatch[1]) * 3600 + Number(hmsMatch[2]) * 60 + Number(hmsMatch[3]);
-  }
-  // Tempo mm:ss -> segundos
-  const timeMatch = /^(\d{1,3}):([0-5]\d)$/.exec(trimmed);
-  if (timeMatch) {
-    return Number(timeMatch[1]) * 60 + Number(timeMatch[2]);
-  }
-  const numMatch = /-?\d+(?:[.,]\d+)?/.exec(trimmed);
-  if (numMatch) {
-    const n = Number(numMatch[0].replace(",", "."));
-    return Number.isFinite(n) ? n : null;
-  }
-  return null;
-}
 
 export default function AccountHome() {
   const location = useLocation();
@@ -196,7 +181,7 @@ export default function AccountHome() {
 
         return {
           hasData: true,
-          title: primaryMetric.titulo,
+          title: stripDuplicateUnitSuffix(primaryMetric.titulo, primaryMetric.unidade),
           subtitle: `${entries.length} ${
             entries.length === 1 ? "sessão registrada" : "sessões registradas"
           } na rotina`,
@@ -238,7 +223,9 @@ export default function AccountHome() {
 
     return {
       hasData: false,
-      title: primaryMetric ? primaryMetric.titulo : "Acompanhamento de métricas",
+      title: primaryMetric
+        ? stripDuplicateUnitSuffix(primaryMetric.titulo, primaryMetric.unidade)
+        : "Acompanhamento de métricas",
       subtitle: activeRoutine
         ? "Finalize sua primeira sessão para visualizar o gráfico de evolução"
         : "Nenhuma rotina ativa vinculada",
@@ -347,7 +334,9 @@ export default function AccountHome() {
                 <span className="student-panel__next-weekday">{nextSession.diaSemana}</span>
                 <strong className="student-panel__next-day">{nextSession.dataPlanejada}</strong>
                 <span className="student-panel__next-time">
-                  {nextSession.duracaoPlanejada ? `${nextSession.duracaoPlanejada} min` : "Treino"}
+                  {nextSession.duracaoPlanejada
+                    ? formatDurationMinutes(nextSession.duracaoPlanejada)
+                    : "Treino"}
                 </span>
               </div>
 

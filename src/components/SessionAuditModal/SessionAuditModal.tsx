@@ -4,6 +4,7 @@ import { History, X } from "lucide-react";
 import Button from "../Button/Button";
 import Badge from "../Badge/Badge";
 import { sessionDetailService } from "../../services/sessionDetailService";
+import { formatDurationMinutes } from "../../utils/durationFormat";
 import type { AuditoriaDesempenhoItem } from "../../types/sessionDetail";
 import "./SessionAuditModal.css";
 
@@ -50,6 +51,16 @@ export default function SessionAuditModal({ sessionId, onClose }: SessionAuditMo
     }
   };
 
+  const formatAuditValue = (item: AuditoriaDesempenhoItem, raw?: string | null) => {
+    if (item.campo === "DURACAO" && raw != null && /^\d+$/.test(raw.trim())) {
+      return formatDurationMinutes(Number(raw.trim()));
+    }
+    if (item.campo === "OBSERVACOES" && raw === "") {
+      return "Observações removidas";
+    }
+    return raw ?? "";
+  };
+
   return (
     <div className="audit-modal-backdrop" onClick={onClose} role="dialog" aria-modal="true">
       <div className="audit-modal" onClick={(e) => e.stopPropagation()}>
@@ -61,7 +72,7 @@ export default function SessionAuditModal({ sessionId, onClose }: SessionAuditMo
             <h2>Histórico de alterações</h2>
             <p>Registro de auditoria e correções de desempenho</p>
           </div>
-          <button className="audit-modal__close" onClick={onClose} aria-label="Fechar modal">
+          <button type="button" className="audit-modal__close" onClick={onClose} aria-label="Fechar modal">
             <X size={20} />
           </button>
         </header>
@@ -93,20 +104,22 @@ export default function SessionAuditModal({ sessionId, onClose }: SessionAuditMo
                         ? item.metricaTitulo || item.tituloMetrica || "Métrica"
                         : item.campo === "DATA_REAL"
                         ? "Data real de execução"
+                        : item.campo === "DURACAO"
+                        ? "Duração da sessão"
                         : "Observações"}
                     </span>
                   </div>
 
                   <div className="audit-modal__diff">
-                    {item.valorAnterior && (
+                    {item.valorAnterior != null && item.valorAnterior !== "" && (
                       <div className="audit-modal__diff-prev">
                         <span>Valor anterior:</span>
-                        <code>{item.valorAnterior}</code>
+                        <code>{formatAuditValue(item, item.valorAnterior)}</code>
                       </div>
                     )}
                     <div className="audit-modal__diff-next">
                       <span>{item.valorAnterior ? "Novo valor:" : "Valor informado:"}</span>
-                      <code>{item.valorNovo}</code>
+                      <code>{formatAuditValue(item, item.valorNovo)}</code>
                     </div>
                   </div>
 

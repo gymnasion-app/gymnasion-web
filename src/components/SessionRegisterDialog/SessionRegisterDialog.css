@@ -17,4 +17,24 @@
 .session-register__preview strong { color: var(--color-ink-700); font-weight: 600; }
 .session-register__preview ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; color: var(--color-ink-600); }
 .session-register__preview small { color: var(--color-ink-400); font-size: 11px; }
-@media (max-width: 520px) { .session-register__grid { grid-template-columns: 1fr; } .session-register__rpe { grid-template-columns: repeat(5,minmax(0,1fr)); } }
+.session-register__strava-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.session-register__strava-box--warn { background: #fffbeb; border-color: #fde68a; color: #92400e; font-size: 12.5px; }
+.session-register__strava-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.session-register__strava-head label { font-size: 12px; font-weight: 700; color: #fc5200; }
+.session-register__strava-badge { font-size: 11px; font-weight: 600; color: #fc5200; background: rgba(252, 82, 0, 0.1); padding: 2px 8px; border-radius: 999px; }
+.session-register__strava-box select { width: 100%; padding: 7px 10px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 13px; background: #fff; color: #0f172a; }
+.session-register__strava-muted { margin: 0; font-size: 12px; color: var(--color-ink-500); }
+.session-register__strava-warn { margin: 0; font-size: 12px; color: #b45309; font-weight: 500; }
+.session-register__metrics-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.session-register__metric-card { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-surface); }
+.session-register__metric-card.is-blocked { background: #f8fafc; opacity: 0.82; }
+.session-register__metric-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.session-register__metric-head label { font-size: 12.5px; font-weight: 700; color: var(--color-ink-900); }
+.session-register__metric-unit { font-size: 11px; font-weight: 600; color: var(--color-ink-500); }
+.session-register__metric-hint { font-size: 11.5px; color: var(--color-ink-500); }
+.session-register__empty-metrics { margin: 0; font-size: 13px; color: var(--color-ink-500); }
+.session-register__rpe-block { display: flex; flex-direction: column; gap: 8px; padding-top: 4px; }
+.session-register__rpe-header { display: flex; flex-direction: column; gap: 2px; }
+.session-register__rpe-header strong { font-size: 13px; color: var(--color-ink-900); }
+.session-register__rpe-header span { font-size: 12px; color: var(--color-ink-500); }
+@media (max-width: 520px) { .session-register__grid, .session-register__metrics-grid { grid-template-columns: 1fr; } .session-register__rpe { grid-template-columns: repeat(5,minmax(0,1fr)); } }

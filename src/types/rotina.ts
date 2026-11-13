@@ -6,6 +6,7 @@ export interface RoutineMetricSummary {
   id: string;
   titulo: string;
   tipo: TipoMetrica;
+  unidade?: string | null;
   obrigatoria?: boolean;
   quemPreenche?: "ALUNO" | "PERSONAL" | "AMBOS";
   campoStrava?: import("./strava").CampoStrava | null;
@@ -57,6 +58,8 @@ export interface SessaoTreinoPlanejadaDTO {
     id: string;
     nivelCansaco: number | null;
     registradoPor?: string;
+    observacoes?: string | null;
+    stravaAtividadeId?: string | null;
     metricas?: {
       id?: string;
       metricaId: string;
@@ -64,6 +67,7 @@ export interface SessaoTreinoPlanejadaDTO {
       tituloMetrica?: string;
       tipo?: string;
       tipoMetrica?: string;
+      unidade?: string | null;
       valor: string;
     }[];
   } | null;

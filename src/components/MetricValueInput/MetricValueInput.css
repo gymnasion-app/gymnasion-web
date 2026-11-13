@@ -1,0 +1,242 @@
+.mvi-root {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  width: 100%;
+}
+
+.mvi-time-row,
+.mvi-single-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 44px;
+  padding: 0.35rem 0.65rem;
+  border: 1.5px solid #cbd5e1;
+  border-radius: var(--radius-control, 10px);
+  background: #ffffff;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+.mvi-time-row:focus-within,
+.mvi-single-wrap:focus-within,
+.mvi-text-wrap:focus-within {
+  border-color: var(--color-primary-500, #f05a28);
+  box-shadow: var(--shadow-focus, 0 0 0 4px rgb(240 90 40 / 15%));
+}
+
+.mvi-time-row.is-strava,
+.mvi-single-wrap.is-strava {
+  border-color: #fdba74;
+  background: #fffaf5;
+}
+
+.mvi-time-row.is-invalid,
+.mvi-single-wrap.is-invalid,
+.mvi-text-wrap.is-invalid {
+  border-color: var(--color-danger, #f04438);
+  background: #fffafb;
+}
+
+.mvi-time-row.is-disabled,
+.mvi-single-wrap.is-disabled,
+.mvi-text-wrap.is-disabled {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  opacity: 0.85;
+}
+
+.mvi-time-box {
+  width: 3.1rem;
+  min-width: 2.85rem;
+  height: 36px;
+  padding: 0 0.3rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #0f172a;
+  font: inherit;
+  font-size: max(1rem, 1em);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.mvi-time-box:focus-visible {
+  outline: 2px solid var(--color-primary-600, #d9461a);
+  outline-offset: 1px;
+  background: #ffffff;
+}
+
+.mvi-time-box:disabled {
+  cursor: not-allowed;
+  color: #64748b;
+}
+
+.mvi-time-sep {
+  font-weight: 700;
+  font-size: 1rem;
+  color: #64748b;
+  user-select: none;
+}
+
+.mvi-hours-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 32px;
+  padding: 0.25rem 0.6rem;
+  margin-left: auto;
+  border: 1px dashed #94a3b8;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #334155;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+}
+
+.mvi-hours-btn:hover {
+  border-color: var(--color-primary-500, #f05a28);
+  color: var(--color-primary-600, #d9461a);
+  background: #fff4ef;
+}
+
+.mvi-hours-btn:focus-visible {
+  outline: 2px solid var(--color-primary-600, #d9461a);
+  outline-offset: 2px;
+}
+
+.mvi-leading-icon {
+  display: inline-flex;
+  align-items: center;
+  color: #e11d48;
+  flex-shrink: 0;
+}
+
+.mvi-single-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: #0f172a;
+  font: inherit;
+  font-size: max(1rem, 1em);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  padding: 0.25rem 0.15rem;
+  outline: none;
+}
+
+.mvi-single-input--fc {
+  max-width: 4.5rem;
+}
+
+.mvi-single-input:disabled {
+  cursor: not-allowed;
+  color: #64748b;
+}
+
+.mvi-unit-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.mvi-strava-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: #fff1eb;
+  border: 1px solid #fdba74;
+  color: #c2410c;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.mvi-time-row .mvi-strava-badge {
+  margin-left: 0.25rem;
+}
+
+.mvi-text-wrap {
+  display: flex;
+  flex-direction: column;
+  border: 1.5px solid #cbd5e1;
+  border-radius: var(--radius-control, 10px);
+  background: #ffffff;
+  padding: 0.5rem 0.65rem 0.35rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.mvi-textarea {
+  width: 100%;
+  min-height: 2.8rem;
+  resize: vertical;
+  border: none;
+  background: transparent;
+  color: #0f172a;
+  font: inherit;
+  font-size: max(1rem, 1em);
+  line-height: 1.45;
+  outline: none;
+}
+
+.mvi-textarea:disabled {
+  cursor: not-allowed;
+  color: #64748b;
+}
+
+.mvi-text-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-top: 0.2rem;
+}
+
+.mvi-char-counter {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-variant-numeric: tabular-nums;
+}
+
+.mvi-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #b54708;
+  line-height: 1.35;
+}
+
+.mvi-error {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--color-danger-700, #b42318);
+  line-height: 1.35;
+}
+
+@media (pointer: coarse) {
+  .mvi-time-row,
+  .mvi-single-wrap {
+    min-height: 48px;
+  }
+
+  .mvi-time-box {
+    height: 40px;
+  }
+}

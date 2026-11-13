@@ -15,32 +15,32 @@ function load(path, dependencies = {}) {
   return exports;
 }
 
-const model = load("features/metrics/metricModel.ts");
+const metricValueFormat = load("utils/metricValueFormat.ts");
+const model = load("features/metrics/metricModel.ts", {
+  "../../utils/metricValueFormat": metricValueFormat,
+});
 
-const makeMetric = (id, titulo, modalidadeId, tipo = "NUMERICO", registros = 0, ativo = true, descontinuada = false, quem = "ALUNO") => ({
+const makeMetric = (id, titulo, modalidadeId, tipo = "NUMERICO", registros = 0, ativo = true, quem = "ALUNO") => ({
   id,
   titulo,
   modalidadeId,
   nomeModalidade: modalidadeId === 1 ? "Natação" : modalidadeId === 2 ? "Tênis" : "Academia",
   tipo,
-  quantidadeAlunosComRegistro: registros,
+  quantidadeAlunosComRegistros: registros,
   ativo,
-  descontinuada,
   quemPreenche: quem,
   obrigatoria: true,
 });
 
-test("getMetricStudentCount extracts count from either field", () => {
-  assert.equal(model.getMetricStudentCount({ quantidadeAlunosComRegistro: 6 }), 6);
+test("getMetricStudentCount extracts count from quantidadeAlunosComRegistros", () => {
   assert.equal(model.getMetricStudentCount({ quantidadeAlunosComRegistros: 4 }), 4);
   assert.equal(model.getMetricStudentCount({}), 0);
 });
 
-test("isMetricActive respects descontinuada flag and fallback to ativo", () => {
-  assert.equal(model.isMetricActive({ descontinuada: false, ativo: true }), true);
-  assert.equal(model.isMetricActive({ descontinuada: true, ativo: true }), false);
+test("isMetricActive respects ativo flag", () => {
   assert.equal(model.isMetricActive({ ativo: false }), false);
   assert.equal(model.isMetricActive({ ativo: true }), true);
+  assert.equal(model.isMetricActive({}), true);
 });
 
 test("getPreenchimentoLabel returns human-friendly Portuguese labels", () => {
@@ -50,13 +50,12 @@ test("getPreenchimentoLabel returns human-friendly Portuguese labels", () => {
   assert.equal(model.getPreenchimentoLabel(undefined), "aluno e personal");
 });
 
-test("normalizeTipo handles aliases TEMPO_CRONOMETRO and TEXTO_OBSERVACAO", () => {
-  assert.equal(model.normalizeTipo("TEMPO_CRONOMETRO"), "TEMPO");
+test("normalizeTipo canonicalizes metric types safely", () => {
   assert.equal(model.normalizeTipo("TEMPO"), "TEMPO");
-  assert.equal(model.normalizeTipo("TEXTO_OBSERVACAO"), "TEXTO");
   assert.equal(model.normalizeTipo("TEXTO"), "TEXTO");
   assert.equal(model.normalizeTipo("FREQUENCIA_CARDIACA"), "FREQUENCIA_CARDIACA");
   assert.equal(model.normalizeTipo("NUMERICO"), "NUMERICO");
+  assert.equal(model.normalizeTipo("DESCONHECIDO"), "NUMERICO");
 });
 
 test("toBackendTipoMetrica produces strictly the 4 Spring Boot accepted enum values", () => {
@@ -64,8 +63,6 @@ test("toBackendTipoMetrica produces strictly the 4 Spring Boot accepted enum val
   for (const opt of model.METRIC_TYPE_OPTIONS) {
     assert.equal(allowed.includes(model.toBackendTipoMetrica(opt.value)), true);
   }
-  assert.equal(model.toBackendTipoMetrica("TEMPO_CRONOMETRO"), "TEMPO");
-  assert.equal(model.toBackendTipoMetrica("TEXTO_OBSERVACAO"), "TEXTO");
   assert.equal(model.toBackendTipoMetrica("TEMPO"), "TEMPO");
   assert.equal(model.toBackendTipoMetrica("TEXTO"), "TEXTO");
   assert.equal(model.toBackendTipoMetrica("NUMERICO"), "NUMERICO");
@@ -181,8 +178,8 @@ test("hasStravaSync, getStravaFieldLabel, getMetricTypeBadgeStyle and extended f
 });
 
 test("filterMetrics filters by statusFilter (active vs discontinued)", () => {
-  const activeMetric = makeMetric("1", "Ritmo 100m", 1, "TEMPO", 4, true, false);
-  const discMetric = makeMetric("2", "Pace antigo", 1, "TEMPO", 5, false, true);
+  const activeMetric = makeMetric("1", "Ritmo 100m", 1, "TEMPO", 4, true);
+  const discMetric = makeMetric("2", "Pace antigo", 1, "TEMPO", 5, false);
 
   const onlyActive = model.filterMetrics([activeMetric, discMetric], null, "", {
     statusFilter: "active",
@@ -239,6 +236,14 @@ test("getMarketMetricPresets maps sport presets to modalities and flags alreadyE
   assert.equal(Boolean(swimPace), true);
   assert.equal(swimPace.modalidadeId, 1);
   assert.equal(swimPace.alreadyExists, true);
+  assert.equal(swimPace.campoStrava, "RITMO_MEDIO");
+  assert.equal(swimPace.unidade, "min/100m");
+
+  const runPace = allPresets.find((p) => p.titulo === "Pace médio (min/km)");
+  assert.equal(Boolean(runPace), true);
+  assert.equal(runPace.tipo, "TEMPO");
+  assert.equal(runPace.campoStrava, "RITMO_MEDIO");
+  assert.equal(runPace.unidade, "min/km");
 
   const swimSwolf = allPresets.find((p) => p.titulo.includes("SWOLF"));
   assert.equal(Boolean(swimSwolf), true);

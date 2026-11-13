@@ -2,6 +2,7 @@ import { useId, useState } from "react";
 import UnavailableAction from "../UnavailableAction/UnavailableAction";
 import { evolutionSeries, formatMetric, metricLabels, type MetricSeries, type RoutineMetric } from "../../features/studentProfile/profileModel";
 import { displayDate, localDateKey } from "../../features/personal/dashboardModel";
+import { stripDuplicateUnitSuffix } from "../../utils/metricValueFormat";
 import type { TrainingSession } from "../../types/personalDashboard";
 import "./StudentEvolution.css";
 
@@ -17,18 +18,26 @@ export function EvolutionCard({ series, color = "blue", compact = false }: { ser
   const latest=series.points.at(-1)?.value;
   const first=series.points[0]?.value;
   const delta=first && latest!==undefined && series.points.length>1 ? (latest-first)/Math.abs(first)*100 : null;
+  const cleanTitle = stripDuplicateUnitSuffix(series.title, series.unidade);
+  const avgSuffix = series.unidade
+    ? `${series.unidade} · média`
+    : series.type === "FREQUENCIA_CARDIACA"
+    ? "bpm · média"
+    : series.type === "TEMPO"
+    ? "mm:ss · média"
+    : "média";
   return <section className={`workspace-card evolution-card evolution-card--${color}${compact?" evolution-card--compact":""}`}>
-    <header><div><h2>{series.title}</h2><p>{compact?"Últimas 8 sessões":series.type==="RPE"?"Escala de Borg CR-10":metricLabels[series.type]}</p></div>{delta!==null && <span className="evolution-card__change" title="Variação entre o primeiro e o último registro do período">{delta>0?"+":""}{formatMetric(delta,"NUMERICO")}%</span>}</header>
-    {!compact && <strong className="evolution-card__value">{average===null?"—":formatMetric(average,series.type)} <small>{series.type==="FREQUENCIA_CARDIACA"?"bpm · média":series.type==="TEMPO"?"mm:ss · média":"média"}</small></strong>}
+    <header><div><h2>{cleanTitle}{series.unidade ? ` (${series.unidade})` : ""}</h2><p>{compact?"Últimas 8 sessões":series.type==="RPE"?"Escala de Borg CR-10":series.unidade || metricLabels[series.type]}</p></div>{delta!==null && <span className="evolution-card__change" title="Variação entre o primeiro e o último registro do período">{delta>0?"+":""}{formatMetric(delta,"NUMERICO")}%</span>}</header>
+    {!compact && <strong className="evolution-card__value">{average===null?"—":formatMetric(average,series.type)} <small>{avgSuffix}</small></strong>}
     {!points.length ? <p className="evolution-card__empty">Sem registros para esta métrica no período.</p> : <>
-      <svg viewBox="0 0 500 165" role="img" aria-label={series.title+". Valores disponíveis abaixo."}>
+      <svg viewBox="0 0 500 165" role="img" aria-label={cleanTitle+". Valores disponíveis abaixo."}>
         <defs><linearGradient id={gradient} x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="var(--chart-color)" stopOpacity=".16"/><stop offset="100%" stopColor="var(--chart-color)" stopOpacity="0"/></linearGradient></defs>
         {[15,55,95,135].map(y=><line key={y} x1="10" x2="490" y1={y} y2={y} stroke="var(--color-border)" strokeDasharray="3 5"/>)}
         {points.length>1 && <><polygon points={`${points[0].x},140 ${points.map(p=>p.x+","+p.y).join(" ")} ${points.at(-1)!.x},140`} fill={`url(#${gradient})`}/><polyline points={points.map(p=>p.x+","+p.y).join(" ")} fill="none" stroke="var(--chart-color)" strokeWidth="2.5"/></>}
-        {points.map((p,index)=><circle key={index} cx={p.x} cy={p.y} r="4" fill="white" stroke="var(--chart-color)" strokeWidth="2"><title>{displayDate(p.date)+": "+formatMetric(p.value,series.type)}</title></circle>)}
+        {points.map((p,index)=><circle key={index} cx={p.x} cy={p.y} r="4" fill="white" stroke="var(--chart-color)" strokeWidth="2"><title>{displayDate(p.date)+": "+formatMetric(p.value,series.type)+(series.unidade ? ` ${series.unidade}` : "")}</title></circle>)}
         <text x="10" y="161">{displayDate(firstDate!)}</text><text x="490" y="161" textAnchor="end">{displayDate(lastDate!)}</text>
       </svg>
-      <details><summary>Ver valores</summary><table><thead><tr><th scope="col">Data</th><th scope="col">Valor</th></tr></thead><tbody>{series.points.map((p,index)=><tr key={index}><td>{displayDate(p.date)}</td><td>{formatMetric(p.value,series.type)}</td></tr>)}</tbody></table></details>
+      <details><summary>Ver valores</summary><table><thead><tr><th scope="col">Data</th><th scope="col">Valor{series.unidade ? ` (${series.unidade})` : ""}</th></tr></thead><tbody>{series.points.map((p,index)=><tr key={index}><td>{displayDate(p.date)}</td><td>{formatMetric(p.value,series.type)}{series.unidade ? ` ${series.unidade}` : ""}</td></tr>)}</tbody></table></details>
     </>}
   </section>;
 }

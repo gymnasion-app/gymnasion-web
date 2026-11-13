@@ -24,6 +24,7 @@ import { metricLabels } from "../../features/routines/routineModel";
 import { getPreenchimentoLabel } from "../../features/metrics/metricModel";
 import { authError } from "../../utils/authError";
 import { parseAtividades, serializeAtividades } from "../../utils/activityParser";
+import { formatDurationMinutes, parseDurationToMinutes } from "../../utils/durationFormat";
 import type { MetricaResponseDTO } from "../../types/metric";
 import type { TrainingSession } from "../../types/personalDashboard";
 import type { RotinaResponse } from "../../types/rotina";
@@ -80,7 +81,7 @@ export default function StudentSessionEdit() {
       }
 
       setPlannedDate(sessionData.dataPlanejada || "");
-      setDuration(sessionData.duracao ? `${sessionData.duracao} min` : "40 min");
+      setDuration(formatDurationMinutes(sessionData.duracao || 40));
 
       // Parse atividades reais do backend sem valores estáticos
       const parsedAtividades = parseAtividades(sessionData.atividades);
@@ -198,7 +199,11 @@ export default function StudentSessionEdit() {
         orientations,
       });
 
-      const durMin = parseInt(duration.replace(/\D/g, ""), 10) || 40;
+      const durMin = parseDurationToMinutes(duration);
+      if (!durMin || durMin < 1 || durMin > 1440) {
+        toast.error("Informe uma duração válida (ex: 40 min ou 1h 20min, até 1440 min).");
+        return;
+      }
       const metricasIds = modalityMetrics
         .filter((m) => Boolean(selectedMetrics[m.id]))
         .map((m) => m.id);
@@ -312,7 +317,7 @@ export default function StudentSessionEdit() {
             <header className="session-edit__activities-header">
               <div>
                 <h2>Atividades</h2>
-                <p>Edite ou remova atividades · a aluna verá a versão salva</p>
+                <p>Edite ou remova atividades · o aluno verá a versão salva</p>
               </div>
               <Button
                 variant="secondary"
@@ -444,11 +449,11 @@ export default function StudentSessionEdit() {
             </div>
           </section>
 
-          {/* Card: Orientações para a aluna */}
+          {/* Card: Orientações para o aluno */}
           <section className="workspace-card session-edit__card" aria-label="Orientações">
             <header className="session-edit__card-header">
               <div>
-                <h2>Orientações para a aluna</h2>
+                <h2>Orientações para o aluno</h2>
                 <p>Texto exibido no detalhe da sessão</p>
               </div>
             </header>
@@ -524,7 +529,7 @@ export default function StudentSessionEdit() {
             <div>
               <strong>Somente sessões futuras podem ser editadas</strong>
               <p>
-                As sessões já executadas e seus resultados são preservados. Se a aluna já tiver
+                As sessões já executadas e seus resultados são preservados. Se o aluno já tiver
                 iniciado o registro desta sessão, a edição é bloqueada.
               </p>
             </div>

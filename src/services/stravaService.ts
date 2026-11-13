@@ -36,6 +36,13 @@ export const stravaService = {
     return res.data;
   },
 
+  async obterDetalheAtividade(atividadeId: string): Promise<StravaAtividade> {
+    const res = await api.get<StravaAtividade>(
+      `${BASE_URL}/atividades/${encodeURIComponent(atividadeId)}`
+    );
+    return res.data;
+  },
+
   // Personal Trainer
   async obterStatusAluno(alunoId: string): Promise<StravaStatusResponse> {
     const res = await api.get<StravaStatusResponse>(`/api/personal-trainers/alunos/${encodeURIComponent(alunoId)}/strava/status`);
@@ -46,6 +53,13 @@ export const stravaService = {
     const res = await api.get<StravaAtividade[]>(`/api/personal-trainers/alunos/${encodeURIComponent(alunoId)}/strava/atividades`, {
       params: { limite }
     });
+    return res.data;
+  },
+
+  async obterDetalheAtividadeAluno(alunoId: string, atividadeId: string): Promise<StravaAtividade> {
+    const res = await api.get<StravaAtividade>(
+      `/api/personal-trainers/alunos/${encodeURIComponent(alunoId)}/strava/atividades/${encodeURIComponent(atividadeId)}`
+    );
     return res.data;
   }
 };

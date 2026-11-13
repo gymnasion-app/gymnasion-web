@@ -212,7 +212,15 @@ export default function StravaModal({ onClose, onStatusChanged }: StravaModalPro
                           )}
                           {act.ritmoMedio && (
                             <span className="strava-modal__stat-pill">
-                              {act.ritmoMedio}
+                              {/[a-zA-Z]/.test(act.ritmoMedio)
+                                ? act.ritmoMedio
+                                : `${act.ritmoMedio} ${
+                                    (act.esporte || act.tipo || "").toLowerCase().includes("swim")
+                                      ? "min/100m"
+                                      : (act.esporte || act.tipo || "").toLowerCase().includes("row")
+                                      ? "min/500m"
+                                      : "min/km"
+                                  }`}
                             </span>
                           )}
                         </div>

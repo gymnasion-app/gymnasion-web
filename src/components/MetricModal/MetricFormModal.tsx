@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import toast from "react-hot-toast";
 import { metricaService } from "../../services/metricaService";
 import type {
@@ -6,7 +6,11 @@ import type {
   ResponsavelPreenchimento,
   TipoMetrica,
 } from "../../types/metric";
-import { CampoStrava, CAMPO_STRAVA_OPTIONS } from "../../types/strava";
+import {
+  CampoStrava,
+  CampoStravaGrupo,
+  CAMPO_STRAVA_OPTIONS,
+} from "../../types/strava";
 import type { ModalidadeResponseDTO } from "../../types/modalidade";
 import {
   METRIC_TYPE_OPTIONS,
@@ -15,7 +19,36 @@ import {
   normalizeTipo,
   toBackendTipoMetrica,
 } from "../../features/metrics/metricModel";
+import {
+  UNIT_OPTIONS_BY_TIPO,
+  defaultUnidadeForTipo,
+  isCampoStravaCompatible,
+  isUnidadeValida,
+  sugerirTipoEUnidade,
+} from "../../utils/metricValueFormat";
 import "./MetricFormModal.css";
+
+const CAMPO_STRAVA_GRUPOS: CampoStravaGrupo[] = [
+  "Preenchimento manual",
+  "Distância e Altimetria",
+  "Tempo e Duração",
+  "Ritmo e Velocidade",
+  "Frequência Cardíaca",
+  "Cadência e Potência",
+  "Energia",
+];
+
+function resolveInitialUnidade(tipoValue: string, currentUnidade?: string | null): string {
+  const norm = normalizeTipo(tipoValue);
+  if (norm === "TEXTO") return "";
+  if (norm === "FREQUENCIA_CARDIACA") return "bpm";
+  if (norm === "TEMPO") {
+    return currentUnidade && isUnidadeValida("TEMPO", currentUnidade)
+      ? currentUnidade
+      : (defaultUnidadeForTipo("TEMPO") ?? "mm:ss");
+  }
+  return currentUnidade && isUnidadeValida("NUMERICO", currentUnidade) ? currentUnidade : "";
+}
 
 interface MetricFormModalProps {
   mode: "create" | "edit";
@@ -62,8 +95,13 @@ export default function MetricFormModal({
   });
 
   const [tipo, setTipo] = useState<TipoMetrica>(() => {
-    if (sourceMetric) return sourceMetric.tipo;
+    if (sourceMetric) return normalizeTipo(sourceMetric.tipo);
     return "TEMPO";
+  });
+
+  const [unidade, setUnidade] = useState<string>(() => {
+    const initialTipo = sourceMetric ? normalizeTipo(sourceMetric.tipo) : "TEMPO";
+    return resolveInitialUnidade(initialTipo, sourceMetric?.unidade);
   });
 
   const [obrigatoria, setObrigatoria] = useState<boolean>(() => {
@@ -82,24 +120,42 @@ export default function MetricFormModal({
     return sourceMetric?.campoStrava ? sourceMetric.campoStrava : "NENHUM";
   });
 
+  const [autoAppliedNotice, setAutoAppliedNotice] = useState<{
+    campoLabel: string;
+    tipoLabel: string;
+    unidadeLabel: string;
+  } | null>(null);
+  const [confirmStravaChange, setConfirmStravaChange] = useState<boolean>(false);
+  const [stravaConfirmError, setStravaConfirmError] = useState<string>("");
+
   const [titleError, setTitleError] = useState<string>("");
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const unidadeSelectRef = useRef<HTMLSelectElement | null>(null);
 
-  // Student records count for edit lock
+  // Student records count / backend history flag for edit lock
   const studentCount = isEdit && metricToEdit ? getMetricStudentCount(metricToEdit) : 0;
-  const isTypeLocked = isEdit && studentCount > 0;
+  const isTypeLocked = isEdit && Boolean(metricToEdit?.possuiHistorico ?? (studentCount > 0));
+  const originalCampoStrava: CampoStrava =
+    isEdit && metricToEdit?.campoStrava ? metricToEdit.campoStrava : "NENHUM";
+  const stravaChangedWithHistory = isTypeLocked && campoStrava !== originalCampoStrava;
+  const normalizedTipo = normalizeTipo(tipo);
+  const unitOptions = UNIT_OPTIONS_BY_TIPO[normalizedTipo];
+  const selectedCampoOption = CAMPO_STRAVA_OPTIONS.find((opt) => opt.value === (campoStrava || "NENHUM"));
 
   // Sync state when modal opens or editing metric changes
   useEffect(() => {
     if (isOpen) {
       if (isEdit && metricToEdit) {
+        const nextTipo = normalizeTipo(metricToEdit.tipo);
         setModalidadeId(metricToEdit.modalidadeId);
         setTitulo(metricToEdit.titulo);
-        setTipo(metricToEdit.tipo);
+        setTipo(nextTipo);
+        setUnidade(resolveInitialUnidade(nextTipo, metricToEdit.unidade));
         setObrigatoria(metricToEdit.obrigatoria !== false);
         setQuemPreenche(metricToEdit.quemPreenche || "AMBOS");
         setCampoStrava(metricToEdit.campoStrava || "NENHUM");
       } else if (templateMetric) {
+        const nextTipo = normalizeTipo(templateMetric.tipo);
         if (templateMetric.id) {
           const otherMod = modalidades.find((m) => m.id !== templateMetric.modalidadeId);
           setModalidadeId(otherMod?.id || templateMetric.modalidadeId);
@@ -107,7 +163,8 @@ export default function MetricFormModal({
           setModalidadeId(templateMetric.modalidadeId);
         }
         setTitulo(templateMetric.titulo);
-        setTipo(templateMetric.tipo);
+        setTipo(nextTipo);
+        setUnidade(resolveInitialUnidade(nextTipo, templateMetric.unidade));
         setObrigatoria(templateMetric.obrigatoria !== false);
         setQuemPreenche(templateMetric.quemPreenche || "AMBOS");
         setCampoStrava(templateMetric.campoStrava || "NENHUM");
@@ -115,13 +172,68 @@ export default function MetricFormModal({
         setModalidadeId(defaultModalidadeId || modalidades[0]?.id || 1);
         setTitulo("");
         setTipo("TEMPO");
+        setUnidade(defaultUnidadeForTipo("TEMPO") ?? "mm:ss");
         setObrigatoria(true);
         setQuemPreenche("AMBOS");
         setCampoStrava("NENHUM");
       }
+      setAutoAppliedNotice(null);
+      setConfirmStravaChange(false);
+      setStravaConfirmError("");
       setTitleError("");
     }
   }, [isOpen, isEdit, metricToEdit, templateMetric, defaultModalidadeId, modalidades]);
+
+  const handleTipoChange = (newTipo: TipoMetrica) => {
+    if (isTypeLocked) return;
+    const nextNorm = normalizeTipo(newTipo);
+    const nextUnidade = resolveInitialUnidade(nextNorm, nextNorm === normalizedTipo ? unidade : null);
+    setTipo(nextNorm);
+    setUnidade(nextUnidade);
+    setAutoAppliedNotice(null);
+    if (campoStrava !== "NENHUM" && !isCampoStravaCompatible(campoStrava, nextNorm, nextUnidade || null)) {
+      setCampoStrava("NENHUM");
+    }
+  };
+
+  const handleUnidadeChange = (nextUnidade: string) => {
+    if (isTypeLocked) return;
+    setUnidade(nextUnidade);
+    setAutoAppliedNotice(null);
+    if (campoStrava !== "NENHUM" && !isCampoStravaCompatible(campoStrava, normalizedTipo, nextUnidade || null)) {
+      setCampoStrava("NENHUM");
+    }
+  };
+
+  const handleCampoStravaChange = (nextCampo: CampoStrava) => {
+    setCampoStrava(nextCampo);
+    setConfirmStravaChange(false);
+    setStravaConfirmError("");
+
+    if (isTypeLocked) {
+      return;
+    }
+
+    if (nextCampo === "NENHUM") {
+      setAutoAppliedNotice(null);
+      return;
+    }
+
+    const activeModName = modalidades.find((m) => m.id === modalidadeId)?.nome;
+    const suggestion = sugerirTipoEUnidade(nextCampo, activeModName);
+    if (suggestion) {
+      const nextUnidade = suggestion.unidade ?? "";
+      setTipo(suggestion.tipo);
+      setUnidade(nextUnidade);
+      const nextOpt = CAMPO_STRAVA_OPTIONS.find((opt) => opt.value === nextCampo);
+      const tipoOpt = METRIC_TYPE_OPTIONS.find((opt) => opt.value === suggestion.tipo);
+      setAutoAppliedNotice({
+        campoLabel: nextOpt?.label ?? nextCampo,
+        tipoLabel: tipoOpt?.title ?? suggestion.tipo,
+        unidadeLabel: nextUnidade || "Sem unidade",
+      });
+    }
+  };
 
   // Keyboard shortcut: Escape
   useEffect(() => {
@@ -164,14 +276,27 @@ export default function MetricFormModal({
       return;
     }
 
+    if (stravaChangedWithHistory && !confirmStravaChange) {
+      setStravaConfirmError(
+        "Confirme a alteração do vínculo Strava em uma métrica com histórico antes de salvar."
+      );
+      return;
+    }
+
     setSubmitting(true);
-    const backendTipo = toBackendTipoMetrica(tipo);
-    const campoStravaPayload = campoStrava === "NENHUM" ? null : campoStrava;
+    const backendTipo = toBackendTipoMetrica(normalizedTipo);
+    const normalizedUnidade =
+      normalizedTipo === "TEXTO" ? null : unidade.trim() ? unidade.trim() : null;
+    const campoStravaPayload: CampoStrava = campoStrava || "NENHUM";
+    const resolvedCampoStrava = campoStravaPayload === "NENHUM" ? null : campoStravaPayload;
     try {
       if (isEdit && metricToEdit) {
         const updated = await metricaService.atualizarMetrica(metricToEdit.id, {
           titulo: cleanTitle,
-          tipo: backendTipo,
+          tipo: isTypeLocked ? toBackendTipoMetrica(metricToEdit.tipo) : backendTipo,
+          unidade: isTypeLocked
+            ? metricToEdit.unidade ?? undefined
+            : normalizedUnidade ?? "",
           obrigatoria,
           quemPreenche,
           campoStrava: campoStravaPayload,
@@ -181,10 +306,16 @@ export default function MetricFormModal({
           ...metricToEdit,
           ...updated,
           titulo: cleanTitle,
-          tipo: backendTipo,
+          tipo: isTypeLocked ? metricToEdit.tipo : backendTipo,
+          unidade:
+            updated.unidade !== undefined
+              ? updated.unidade
+              : isTypeLocked
+              ? metricToEdit.unidade ?? null
+              : normalizedUnidade,
           obrigatoria,
           quemPreenche,
-          campoStrava: campoStravaPayload,
+          campoStrava: updated.campoStrava !== undefined ? updated.campoStrava : resolvedCampoStrava,
           modalidadeId,
           nomeModalidade: currentModalityName,
         });
@@ -193,6 +324,7 @@ export default function MetricFormModal({
           modalidadeId,
           titulo: cleanTitle,
           tipo: backendTipo,
+          unidade: normalizedUnidade,
           obrigatoria,
           quemPreenche,
           campoStrava: campoStravaPayload,
@@ -202,14 +334,15 @@ export default function MetricFormModal({
           ...created,
           titulo: cleanTitle,
           tipo: backendTipo,
+          unidade: created.unidade !== undefined ? created.unidade : normalizedUnidade,
           obrigatoria,
           quemPreenche,
-          campoStrava: campoStravaPayload,
+          campoStrava: created.campoStrava !== undefined ? created.campoStrava : resolvedCampoStrava,
           modalidadeId,
           nomeModalidade: currentModalityName,
-          quantidadeAlunosComRegistro: 0,
+          possuiHistorico: false,
+          quantidadeAlunosComRegistros: 0,
           ativo: true,
-          descontinuada: false,
         });
       }
       onClose();
@@ -377,7 +510,7 @@ export default function MetricFormModal({
                 <path d="M7 11V7a5 5 0 0 1 10 0v4" />
               </svg>
               <span>
-                Não é possível alterar o tipo de uma métrica com histórico de registros. Crie uma nova métrica.
+                Não é possível alterar o tipo ou a unidade de uma métrica com histórico de registros. Crie uma nova métrica.
               </span>
             </div>
           )}
@@ -400,7 +533,7 @@ export default function MetricFormModal({
                     } ${isTypeLocked ? "is-disabled" : ""}`}
                     onClick={() => {
                       if (!isTypeLocked) {
-                        setTipo(opt.value);
+                        handleTipoChange(opt.value);
                       }
                     }}
                     disabled={isTypeLocked}
@@ -536,6 +669,36 @@ export default function MetricFormModal({
             </div>
           </div>
 
+          {/* Unidade de medida adaptativa por tipo */}
+          <div className="metric-form-modal__field">
+            <label htmlFor="metric-unidade-select" className="metric-form-modal__label">
+              Unidade de medida
+            </label>
+            <select
+              id="metric-unidade-select"
+              ref={unidadeSelectRef}
+              className="metric-form-modal__select"
+              value={unidade}
+              onChange={(e) => handleUnidadeChange(e.target.value)}
+              disabled={isTypeLocked || submitting || unitOptions.length <= 1}
+            >
+              {unitOptions.map((opt) => (
+                <option key={opt.value || "SEM_UNIDADE"} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <p className="metric-form-modal__helper">
+              {normalizedTipo === "TEXTO"
+                ? "Métricas de texto livre não utilizam unidade de medida."
+                : normalizedTipo === "FREQUENCIA_CARDIACA"
+                ? "Frequência cardíaca é sempre registrada em bpm."
+                : normalizedTipo === "TEMPO"
+                ? "Selecione cronômetro (mm:ss ou hh:mm:ss) ou formato de ritmo (pace)."
+                : "Escolha a unidade ou mantenha Sem unidade para scores, escalas e RPE."}
+            </p>
+          </div>
+
           {/* Vínculo com o Strava (opcional) */}
           <div className="metric-form-modal__field">
             <label htmlFor="metric-strava-select" className="metric-form-modal__label">
@@ -543,22 +706,80 @@ export default function MetricFormModal({
             </label>
             <select
               id="metric-strava-select"
-              className="metric-form-modal__select"
+              className={`metric-form-modal__select ${stravaConfirmError ? "is-error" : ""}`}
               value={campoStrava || "NENHUM"}
-              onChange={(e) => setCampoStrava(e.target.value as CampoStrava)}
+              onChange={(e) => handleCampoStravaChange(e.target.value as CampoStrava)}
               disabled={submitting}
             >
-              {CAMPO_STRAVA_OPTIONS.filter(
-                (opt) => opt.value === "NENHUM" || opt.tiposValidos.includes(normalizeTipo(tipo))
-              ).map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
+              {CAMPO_STRAVA_GRUPOS.map((grupo) => {
+                const opts = CAMPO_STRAVA_OPTIONS.filter((opt) => opt.group === grupo);
+                if (opts.length === 0) return null;
+                return (
+                  <optgroup key={grupo} label={grupo}>
+                    {opts.map((opt) => {
+                      const compatible =
+                        !isTypeLocked ||
+                        isCampoStravaCompatible(opt.value, normalizedTipo, unidade || null);
+                      return (
+                        <option key={opt.value} value={opt.value} disabled={!compatible}>
+                          {compatible ? opt.label : `${opt.label} (incompatível com tipo/unidade)`}
+                        </option>
+                      );
+                    })}
+                  </optgroup>
+                );
+              })}
             </select>
-            <p style={{ fontSize: "0.8125rem", color: "var(--color-neutral-500, #64748b)", marginTop: "4px" }}>
-              Ao importar um treino do Strava, este campo será preenchido automaticamente com o dado selecionado.
-            </p>
+            {selectedCampoOption?.description && (
+              <p className="metric-form-modal__helper">{selectedCampoOption.description}</p>
+            )}
+            {selectedCampoOption?.sensorWarning && (
+              <div className="metric-form-modal__sensor-warning" role="note">
+                {selectedCampoOption.sensorWarning}
+              </div>
+            )}
+            {autoAppliedNotice && !isTypeLocked && (
+              <div className="metric-form-modal__info-banner" role="status">
+                <span>
+                  Sugestão Strava aplicada para <strong>{autoAppliedNotice.campoLabel}</strong>: Tipo{" "}
+                  <strong>{autoAppliedNotice.tipoLabel}</strong> e Unidade{" "}
+                  <strong>{autoAppliedNotice.unidadeLabel}</strong>. Revise e confirme antes de salvar.
+                </span>
+                {unitOptions.length > 1 && (
+                  <button
+                    type="button"
+                    className="metric-form-modal__info-action"
+                    onClick={() => unidadeSelectRef.current?.focus()}
+                  >
+                    Alterar unidade manualmente
+                  </button>
+                )}
+              </div>
+            )}
+            {stravaChangedWithHistory && (
+              <>
+                <label className="metric-form-modal__confirm-box">
+                  <input
+                    type="checkbox"
+                    checked={confirmStravaChange}
+                    onChange={(e) => {
+                      setConfirmStravaChange(e.target.checked);
+                      if (e.target.checked) setStravaConfirmError("");
+                    }}
+                  />
+                  <span>
+                    {campoStrava === "NENHUM"
+                      ? "Confirmo que desejo desvincular esta métrica do Strava. Os registros históricos existentes serão mantidos."
+                      : "Confirmo a alteração do vínculo Strava nesta métrica com histórico. Apenas futuras importações usarão o novo campo."}
+                  </span>
+                </label>
+                {stravaConfirmError && (
+                  <p className="metric-form-modal__error-msg" role="alert">
+                    {stravaConfirmError}
+                  </p>
+                )}
+              </>
+            )}
           </div>
 
           {/* Footer actions */}

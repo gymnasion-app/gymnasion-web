@@ -36,6 +36,7 @@ export interface StudentActiveRoutineInfo {
 export interface StudentExecutionConfirmDetails {
   dataReal?: string;
   duracao?: number | null;
+  stravaAtividadeId?: string | null;
   resultados?: StudentSessionMetricResult[];
   alreadySavedOnBackend?: boolean;
 }

@@ -9,7 +9,8 @@ function load(path, dependencies={}) {
   return exports;
 }
 const dates=load('features/personal/dashboardModel.ts');
-const model=load('features/studentProfile/profileModel.ts',{'../personal/dashboardModel':dates});
+const metricValueFormat=load('utils/metricValueFormat.ts');
+const model=load('features/studentProfile/profileModel.ts',{'../personal/dashboardModel':dates,'../../utils/metricValueFormat':metricValueFormat});
 const session=(id,date,owner='a',value='01:42')=>({id,status:'CONCLUIDA',dataReal:date,desempenho:{alunoId:owner,nivelCansaco:7,metricas:[{metricaId:'time',tituloMetrica:'Tempo',tipoMetrica:'TEMPO',valor:value}]}});
 test('history excludes other students and planned sessions, and deduplicates',()=>{
   const rows=[session('1','2026-10-05'),session('1','2026-10-05'),session('2','2026-10-08','b'),{...session('3','2026-10-08'),status:'PLANEJADA'}];
@@ -25,20 +26,25 @@ test('metric input validation and serialization match backend constraints',()=>{
   assert.ok(model.metricError('NUMERICO','Infinity'));
   assert.ok(model.metricError('TEMPO','01:99'));
   assert.equal(model.metricError('TEMPO','1:42'),undefined);
+  assert.equal(model.metricError('TEMPO','01:15:30'),undefined);
+  assert.ok(model.metricError('TEMPO','75:30'));
+  assert.equal(model.metricError('TEMPO','75:30','min/km'),undefined);
   assert.equal(model.serializeMetric({tipo:'TEMPO'},'1:42'),'01:42');
+  assert.equal(model.serializeMetric({tipo:'TEMPO'},'1:15:30'),'01:15:30');
   assert.equal(model.serializeMetric({tipo:'NUMERICO'},'12,5'),'12.5');
   for(const value of ['29','251','148.5'])assert.ok(model.metricError('FREQUENCIA_CARDIACA',value));
   assert.equal(model.metricError('FREQUENCIA_CARDIACA','148'),undefined);
   assert.ok(model.metricError('TEXTO','x'.repeat(256)));
 });
 test('evolution respects dates and metric IDs without mixing similarly named metrics',()=>{
-  const rows=[session('1','2026-10-05'),session('2','2026-09-01'),{...session('3','2026-10-08'),desempenho:{alunoId:'a',nivelCansaco:null,metricas:[{metricaId:'other',tituloMetrica:'Tempo',tipoMetrica:'TEMPO',valor:'02:00'}]}}];
+  const rows=[session('1','2026-10-05'),session('2','2026-09-01'),{...session('3','2026-10-08'),desempenho:{alunoId:'a',nivelCansaco:null,metricas:[{metricaId:'other',tituloMetrica:'Tempo',tipoMetrica:'TEMPO',valor:'01:15:00'}]}}];
   const series=model.evolutionSeries(rows,[],'2026-10-01','2026-10-31');
   assert.equal(series.find(s=>s.id==='time').points.length,1);
   assert.equal(series.find(s=>s.id==='time').points[0].value,102);
-  assert.equal(series.find(s=>s.id==='other').points[0].value,120);
+  assert.equal(series.find(s=>s.id==='other').points[0].value,4500);
   assert.equal(series.find(s=>s.id==='rpe').points.length,1);
-  assert.equal(model.formatMetric(119.9,'TEMPO'),'2:00');
+  assert.equal(model.formatMetric(119.9,'TEMPO'),'02:00');
+  assert.equal(model.formatMetric(4530,'TEMPO'),'01:15:30');
 });
 test('weekly summary follows actual execution date and ignores other students',()=>{
   const data={sessoes:[{dataPlanejada:'2026-10-12',dataReal:'2026-10-14',status:'CONCLUIDA',desempenho:{alunoId:'a'}},{dataPlanejada:'2026-10-13',status:'PLANEJADA'},{dataReal:'2026-10-14',status:'CONCLUIDA',desempenho:{alunoId:'b'}}]};

@@ -31,7 +31,9 @@ export interface TrainingSession {
     registradoPor: string;
     alunoId: string | null;
     nomeAluno: string | null;
-    metricas: { id: string; metricaId: string; tituloMetrica: string; tipoMetrica: string; valor: string }[];
+    observacoes?: string | null;
+    stravaAtividadeId?: string | null;
+    metricas: { id: string; metricaId: string; tituloMetrica: string; tipoMetrica: string; unidade?: string | null; valor: string }[];
   } | null;
 }
 export interface StudentHistory { alunoId: string; sessions: TrainingSession[] }

@@ -167,7 +167,8 @@ export function applySessionExecution(
   rpe: number | null,
   realDateLabel = "hoje",
   resultados?: StudentWorkoutSession["resultados"],
-  duracaoReal?: number | null
+  duracaoReal?: number | null,
+  stravaAtividadeId?: string | null
 ): StudentRoutineWeek[] {
   let nextHighlightAssigned = false;
 
@@ -180,7 +181,14 @@ export function applySessionExecution(
         destaque: false,
         rpe: rpe ?? sessao.rpe ?? null,
         dataReal: realDateLabel,
-        duracaoReal: duracaoReal ?? sessao.duracaoReal ?? sessao.duracaoPlanejada,
+        duracaoReal:
+          duracaoReal !== undefined
+            ? duracaoReal
+            : sessao.duracaoReal ?? sessao.duracaoPlanejada,
+        stravaAtividadeId:
+          stravaAtividadeId !== undefined
+            ? stravaAtividadeId
+            : sessao.stravaAtividadeId ?? null,
         resultados: resultados && resultados.length > 0 ? resultados : sessao.resultados,
       };
     });
@@ -303,8 +311,10 @@ export function mapPlanningToWeeks(
       id: m.id,
       titulo: m.titulo,
       tipo: m.tipo,
+      unidade: m.unidade ?? null,
       obrigatoria: Boolean(m.obrigatoria),
       quemPreenche: m.quemPreenche || "ALUNO",
+      campoStrava: m.campoStrava ?? null,
     })),
   };
 
@@ -346,9 +356,10 @@ export function mapPlanningToWeeks(
         dataPlanejadaIso: s.dataPlanejada,
         titulo: headline ? `Sessão ${idx + 1} · ${headline}` : `Sessão ${idx + 1}`,
         descricao: s.atividades || "Sem descrição informada.",
-        duracaoPlanejada: s.duracao || 50,
-        duracaoReal: s.duracao,
+        duracaoPlanejada: s.duracao ?? undefined,
+        duracaoReal: s.duracao ?? null,
         dataReal: s.dataReal ? formatDataPlanejadaDdMm(s.dataReal) : null,
+        stravaAtividadeId: s.desempenho?.stravaAtividadeId ?? null,
         status,
         destaque,
         rpe,
@@ -360,14 +371,16 @@ export function mapPlanningToWeeks(
           id: m.id,
           titulo: m.titulo,
           tipo: m.tipo,
+          unidade: m.unidade ?? null,
           obrigatoria: Boolean(m.obrigatoria),
           quemPreenche: (m.quemPreenche || "ALUNO") as "PERSONAL" | "ALUNO" | "AMBOS",
-          campoStrava: m.campoStrava,
+          campoStrava: m.campoStrava ?? null,
         })),
         resultados: (s.desempenho?.metricas || []).map((m) => ({
           metricaId: m.metricaId,
           titulo: m.titulo || m.tituloMetrica || "Métrica",
           tipo: m.tipo || m.tipoMetrica || "NUMERICO",
+          unidade: m.unidade ?? null,
           valor: m.valor,
         })),
       };
@@ -565,8 +578,8 @@ export const INITIAL_ROUTINE_WEEKS: StudentRoutineWeek[] = [
         status: "VALIDADA",
         rpe: 6,
         resultados: [
-          { metricaId: "m-ritmo", titulo: "Ritmo médio /100m", tipo: "TEMPO", valor: "01:46" },
-          { metricaId: "m-fc", titulo: "FC média", tipo: "FREQUENCIA_CARDIACA", valor: "154 bpm" },
+          { metricaId: "m-ritmo", titulo: "Ritmo médio /100m", tipo: "TEMPO", unidade: "min/100m", valor: "01:46" },
+          { metricaId: "m-fc", titulo: "FC média", tipo: "FREQUENCIA_CARDIACA", unidade: "bpm", valor: "154 bpm" },
         ],
       },
       {
@@ -585,8 +598,8 @@ export const INITIAL_ROUTINE_WEEKS: StudentRoutineWeek[] = [
         status: "VALIDADA",
         rpe: 7,
         resultados: [
-          { metricaId: "m-ritmo", titulo: "Ritmo médio /100m", tipo: "TEMPO", valor: "01:45" },
-          { metricaId: "m-fc", titulo: "FC média", tipo: "FREQUENCIA_CARDIACA", valor: "155 bpm" },
+          { metricaId: "m-ritmo", titulo: "Ritmo médio /100m", tipo: "TEMPO", unidade: "min/100m", valor: "01:45" },
+          { metricaId: "m-fc", titulo: "FC média", tipo: "FREQUENCIA_CARDIACA", unidade: "bpm", valor: "155 bpm" },
         ],
       },
       {
@@ -605,8 +618,8 @@ export const INITIAL_ROUTINE_WEEKS: StudentRoutineWeek[] = [
         status: "VALIDADA",
         rpe: 7,
         resultados: [
-          { metricaId: "m-ritmo", titulo: "Ritmo médio /100m", tipo: "TEMPO", valor: "01:44" },
-          { metricaId: "m-fc", titulo: "FC média", tipo: "FREQUENCIA_CARDIACA", valor: "153 bpm" },
+          { metricaId: "m-ritmo", titulo: "Ritmo médio /100m", tipo: "TEMPO", unidade: "min/100m", valor: "01:44" },
+          { metricaId: "m-fc", titulo: "FC média", tipo: "FREQUENCIA_CARDIACA", unidade: "bpm", valor: "153 bpm" },
         ],
       },
       {
@@ -625,8 +638,8 @@ export const INITIAL_ROUTINE_WEEKS: StudentRoutineWeek[] = [
         status: "VALIDADA",
         rpe: 5,
         resultados: [
-          { metricaId: "m-ritmo", titulo: "Ritmo médio /100m", tipo: "TEMPO", valor: "01:48" },
-          { metricaId: "m-fc", titulo: "FC média", tipo: "FREQUENCIA_CARDIACA", valor: "142 bpm" },
+          { metricaId: "m-ritmo", titulo: "Ritmo médio /100m", tipo: "TEMPO", unidade: "min/100m", valor: "01:48" },
+          { metricaId: "m-fc", titulo: "FC média", tipo: "FREQUENCIA_CARDIACA", unidade: "bpm", valor: "142 bpm" },
         ],
       },
     ],
@@ -653,9 +666,9 @@ export const INITIAL_ROUTINE_WEEKS: StudentRoutineWeek[] = [
         status: "CONCLUIDA",
         rpe: 6,
         resultados: [
-          { metricaId: "m-ritmo", titulo: "Ritmo médio /100m", tipo: "TEMPO", valor: "01:43" },
-          { metricaId: "m-dist", titulo: "Distância total", tipo: "NUMERICO", valor: "1,0 km" },
-          { metricaId: "m-fc", titulo: "FC média", tipo: "FREQUENCIA_CARDIACA", valor: "150 bpm" },
+          { metricaId: "m-ritmo", titulo: "Ritmo médio /100m", tipo: "TEMPO", unidade: "min/100m", valor: "01:43" },
+          { metricaId: "m-dist", titulo: "Distância total", tipo: "NUMERICO", unidade: "km", valor: "1,0 km" },
+          { metricaId: "m-fc", titulo: "FC média", tipo: "FREQUENCIA_CARDIACA", unidade: "bpm", valor: "150 bpm" },
         ],
       },
       {
@@ -674,9 +687,9 @@ export const INITIAL_ROUTINE_WEEKS: StudentRoutineWeek[] = [
         status: "CONCLUIDA",
         rpe: 7,
         resultados: [
-          { metricaId: "m-ritmo", titulo: "Ritmo médio /100m", tipo: "TEMPO", valor: "01:42" },
-          { metricaId: "m-dist", titulo: "Distância total", tipo: "NUMERICO", valor: "1,5 km" },
-          { metricaId: "m-fc", titulo: "FC média", tipo: "FREQUENCIA_CARDIACA", valor: "152 bpm" },
+          { metricaId: "m-ritmo", titulo: "Ritmo médio /100m", tipo: "TEMPO", unidade: "min/100m", valor: "01:42" },
+          { metricaId: "m-dist", titulo: "Distância total", tipo: "NUMERICO", unidade: "km", valor: "1,5 km" },
+          { metricaId: "m-fc", titulo: "FC média", tipo: "FREQUENCIA_CARDIACA", unidade: "bpm", valor: "152 bpm" },
         ],
       },
       {

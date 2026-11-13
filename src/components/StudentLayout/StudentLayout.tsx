@@ -16,6 +16,7 @@ import { authService } from "../../services/authService";
 import { relatorioService } from "../../services/relatorioService";
 import { session } from "../../services/session";
 import { parseAtividades } from "../../utils/activityParser";
+import { formatDurationMinutes } from "../../utils/durationFormat";
 import "./StudentLayout.css";
 
 export default function StudentLayout() {
@@ -218,7 +219,6 @@ export default function StudentLayout() {
       {rpeModalSessionId && (
         <StudentRpeModal
           sessionId={rpeModalSessionId}
-          initialRpe={7}
           busy={rpeBusy}
           onClose={closeRpeModal}
           onConfirm={(rpe, details) => void confirmRpeExecution(rpe, details)}
@@ -277,7 +277,7 @@ export default function StudentLayout() {
                 </Badge>
                 {inspectedSession.duracaoPlanejada && (
                   <span className="student-session-dialog__meta">
-                    Duração estimada: {inspectedSession.duracaoPlanejada} min
+                    Duração estimada: {formatDurationMinutes(inspectedSession.duracaoPlanejada)}
                   </span>
                 )}
                 {typeof inspectedSession.rpe === "number" && (

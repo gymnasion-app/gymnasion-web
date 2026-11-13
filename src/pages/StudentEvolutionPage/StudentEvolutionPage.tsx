@@ -6,6 +6,7 @@ import { useStudentArea } from "../../features/studentArea/StudentContext";
 import { reportPeriodFromDays } from "../../features/report/reportModel";
 import { alunoService } from "../../services/alunoService";
 import { relatorioService } from "../../services/relatorioService";
+import { formatMetricDisplayValue, stripDuplicateUnitSuffix } from "../../utils/metricValueFormat";
 import type { EvolutionPeriodKey, StudentEvolutionResponseDTO } from "../../types/studentArea";
 import "./StudentEvolutionPage.css";
 
@@ -17,6 +18,7 @@ const PERIOD_OPTIONS: { key: EvolutionPeriodKey; label: string; days: number }[]
 
 export default function StudentEvolutionPage() {
   const [period, setPeriod] = useState<EvolutionPeriodKey>("3m");
+  const [selectedModalityId, setSelectedModalityId] = useState<number | "ALL">("ALL");
   const [loading, setLoading] = useState<boolean>(true);
   const [evoData, setEvoData] = useState<StudentEvolutionResponseDTO | null>(null);
   const [report, setReport] = useState(false);
@@ -38,7 +40,11 @@ export default function StudentEvolutionPage() {
       ].join("-");
 
     alunoService
-      .consultarEvolucao({ dataInicio: fmt(start), dataFim: fmt(end) })
+      .consultarEvolucao({
+        ...(selectedModalityId !== "ALL" ? { modalidadeId: selectedModalityId } : {}),
+        dataInicio: fmt(start),
+        dataFim: fmt(end),
+      })
       .then((res) => {
         if (!active) return;
         setEvoData(res);
@@ -54,30 +60,61 @@ export default function StudentEvolutionPage() {
     return () => {
       active = false;
     };
-  }, [period]);
+  }, [period, selectedModalityId]);
+
+  const modalidadesDisponiveis = evoData?.modalidadesDisponiveis || [];
 
   return (
     <div className="student-evo-page">
       <div className="student-evo-page__toolbar">
-        <div
-          className="student-evo-page__periods"
-          role="group"
-          aria-label="Período de análise da evolução"
-        >
-          {PERIOD_OPTIONS.map((opt) => {
-            const active = period === opt.key;
-            return (
-              <button
-                key={opt.key}
-                type="button"
-                aria-pressed={active}
-                className={`student-evo-page__period-btn${active ? " is-active" : ""}`}
-                onClick={() => setPeriod(opt.key)}
-              >
-                {opt.label}
-              </button>
-            );
-          })}
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+          <div
+            className="student-evo-page__periods"
+            role="group"
+            aria-label="Período de análise da evolução"
+          >
+            {PERIOD_OPTIONS.map((opt) => {
+              const active = period === opt.key;
+              return (
+                <button
+                  key={opt.key}
+                  type="button"
+                  aria-pressed={active}
+                  className={`student-evo-page__period-btn${active ? " is-active" : ""}`}
+                  onClick={() => setPeriod(opt.key)}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {modalidadesDisponiveis.length > 1 && (
+            <select
+              aria-label="Filtrar evolução por modalidade"
+              className="student-evo-page__modality-select"
+              value={selectedModalityId}
+              onChange={(e) => {
+                const raw = e.target.value;
+                setSelectedModalityId(raw === "ALL" ? "ALL" : Number(raw));
+              }}
+              style={{
+                height: "36px",
+                padding: "0 10px",
+                borderRadius: "8px",
+                border: "1px solid var(--color-border, #e2e8f0)",
+                background: "var(--color-surface, #ffffff)",
+                fontSize: "0.875rem",
+              }}
+            >
+              <option value="ALL">Todas as modalidades</option>
+              {modalidadesDisponiveis.map((mod) => (
+                <option key={mod.id} value={mod.id}>
+                  {mod.nome}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         <button
@@ -130,24 +167,51 @@ export default function StudentEvolutionPage() {
 
             {/* Gráficos das métricas da modalidade (US-15 C1/C3) */}
             {(evoData.metricas || []).map((m) => {
-              const numericPoints = (m.pontos || []).filter((p): p is typeof p & { valorNumerico: number } => typeof p.valorNumerico === "number");
+              const numericPoints = (m.pontos || []).filter(
+                (p): p is typeof p & { valorNumerico: number } => typeof p.valorNumerico === "number"
+              );
               if (numericPoints.length === 0) return null;
               const lastPoint = numericPoints[numericPoints.length - 1];
+              const cleanTitle = stripDuplicateUnitSuffix(m.titulo, m.unidade);
+              const visual = m.tendencia?.indicadorVisual;
+              const badgeTone =
+                visual === "MELHORIA"
+                  ? "success"
+                  : visual === "REGRESSAO"
+                  ? "warning"
+                  : "neutral";
+              const badgeLabel =
+                visual === "MELHORIA"
+                  ? "Melhoria"
+                  : visual === "REGRESSAO"
+                  ? "Regressão"
+                  : m.tendencia?.direcao === "AUMENTO"
+                  ? "Aumento"
+                  : m.tendencia?.direcao === "REDUCAO"
+                  ? "Redução"
+                  : "Estável";
+
               return (
-                <section key={m.metricaId} className="student-evo-page__card" aria-label={m.titulo}>
+                <section key={m.metricaId} className="student-evo-page__card" aria-label={cleanTitle}>
                   <header className="student-evo-page__card-header">
                     <div>
-                      <h2>{m.titulo}</h2>
-                      <p>{m.descontinuada ? "Métrica descontinuada" : "Evolução temporal"}</p>
+                      <h2>{cleanTitle}</h2>
+                      <p>
+                        {m.descontinuada
+                          ? "Métrica descontinuada"
+                          : m.unidade
+                          ? `Unidade: ${m.unidade}`
+                          : "Evolução temporal"}
+                      </p>
                     </div>
-                    <Badge tone={m.tendencia?.direcao === "MELHORA" ? "success" : m.tendencia?.direcao === "REGRESSAO" ? "warning" : "neutral"}>
-                      {m.tendencia?.indicadorVisual || "Estável"}
+                    <Badge tone={badgeTone} title={m.tendencia?.resumo || undefined}>
+                      {badgeLabel}
                     </Badge>
                   </header>
 
                   <div className="student-evo-page__card-value">
-                    <strong>{lastPoint.valor}</strong>
-                    <span>{m.tipo}</span>
+                    <strong>{formatMetricDisplayValue(lastPoint.valor, m.tipo, m.unidade)}</strong>
+                    <span>{m.unidade || (m.tipo === "FREQUENCIA_CARDIACA" ? "bpm" : m.tipo === "TEMPO" ? "mm:ss" : "")}</span>
                   </div>
 
                   <div className="student-evo-page__card-chart">
@@ -155,7 +219,7 @@ export default function StudentEvolutionPage() {
                       values={numericPoints.map((p) => p.valorNumerico)}
                       labels={numericPoints.map((p) => p.data?.slice(5) || "")}
                       color="blue"
-                      ariaLabel={`Gráfico de evolução da métrica ${m.titulo}`}
+                      ariaLabel={`Gráfico de evolução da métrica ${cleanTitle}`}
                     />
                   </div>
                 </section>

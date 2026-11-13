@@ -10,9 +10,9 @@ import {
 } from '../types/metric';
 
 function sanitizeBackendTipo(tipo: string): 'FREQUENCIA_CARDIACA' | 'TEXTO' | 'TEMPO' | 'NUMERICO' {
-  if (tipo === 'TEMPO_CRONOMETRO' || tipo === 'TEMPO') return 'TEMPO';
-  if (tipo === 'TEXTO_OBSERVACAO' || tipo === 'TEXTO') return 'TEXTO';
-  if (tipo === 'FREQUENCIA_CARDIACA') return 'FREQUENCIA_CARDIACA';
+  if (tipo === 'TEMPO' || tipo === 'TEXTO' || tipo === 'FREQUENCIA_CARDIACA' || tipo === 'NUMERICO') {
+    return tipo;
+  }
   return 'NUMERICO';
 }
 
@@ -32,9 +32,10 @@ export const metricaService = {
   },
 
   async criarMetrica(data: CriarMetricaRequestDTO): Promise<MetricaResponseDTO> {
-    const payload = {
+    const payload: CriarMetricaRequestDTO = {
       ...data,
       tipo: sanitizeBackendTipo(data.tipo),
+      unidade: data.unidade === '' ? null : (data.unidade ?? null),
     };
     const response = await api.post<MetricaResponseDTO>('/api/personal-trainers/metricas', payload);
     return response.data;
@@ -44,9 +45,10 @@ export const metricaService = {
     id: string,
     data: AtualizarMetricaRequestDTO
   ): Promise<MetricaResponseDTO> {
-    const payload = {
+    const payload: AtualizarMetricaRequestDTO = {
       ...data,
       tipo: sanitizeBackendTipo(data.tipo),
+      ...(data.unidade !== undefined ? { unidade: data.unidade } : {}),
     };
     const response = await api.put<MetricaResponseDTO>(
       `/api/personal-trainers/metricas/${id}`,

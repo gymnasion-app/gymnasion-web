@@ -4,6 +4,7 @@ import Button from "../Button/Button";
 import Badge from "../Badge/Badge";
 import { metricIcons, metricLabels, weekDays } from "../../features/studentProfile/profileModel";
 import { displayDate } from "../../features/personal/dashboardModel";
+import { normalizeTipo, stripDuplicateUnitSuffix } from "../../utils/metricValueFormat";
 import type { RotinaResponse } from "../../types/rotina";
 import type { StudentTracking } from "../../types/studentProfile";
 import "./ProfileRoutineCard.css";
@@ -81,12 +82,15 @@ export default function ProfileRoutineCard({
             {(routine.metricas || []).slice(0, MAX_VISIBLE_METRICS).map((metric) => {
               const filler = metric.quemPreenche ? fillerLabel[metric.quemPreenche] || metric.quemPreenche : "";
               const obrigLabel = metric.obrigatoria !== false ? "Obrigatória" : "Opcional";
-              const tooltip = `${metric.titulo} (${metricLabels[metric.tipo]}) — ${obrigLabel}${filler ? ` · Preenchido por: ${filler}` : ""}`;
+              const normTipo = normalizeTipo(metric.tipo);
+              const cleanTitle = stripDuplicateUnitSuffix(metric.titulo, metric.unidade);
+              const unitOrType = metric.unidade || metricLabels[normTipo];
+              const tooltip = `${cleanTitle} (${unitOrType}) — ${obrigLabel}${filler ? ` · Preenchido por: ${filler}` : ""}`;
               return (
                 <span key={metric.id} title={tooltip}>
-                  <img src={"/student-profile/" + metricIcons[metric.tipo] + ".svg"} alt="" />
-                  <strong>{metric.titulo}</strong>
-                  <small>· {metricLabels[metric.tipo]}</small>
+                  <img src={"/student-profile/" + metricIcons[normTipo] + ".svg"} alt="" />
+                  <strong>{cleanTitle}</strong>
+                  <small>· {unitOrType}</small>
                 </span>
               );
             })}

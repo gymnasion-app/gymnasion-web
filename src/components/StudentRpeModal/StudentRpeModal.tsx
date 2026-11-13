@@ -3,6 +3,7 @@ import axios from "axios";
 import toast from "react-hot-toast";
 import Badge from "../Badge/Badge";
 import Button from "../Button/Button";
+import MetricValueInput from "../MetricValueInput/MetricValueInput";
 import { StudentContext, type StudentExecutionConfirmDetails } from "../../features/studentArea/StudentContext";
 import { getBorgInfo } from "../../features/studentArea/studentAreaModel";
 import { localDateKey } from "../../features/personal/dashboardModel";
@@ -10,8 +11,23 @@ import { alunoService } from "../../services/alunoService";
 import { stravaService } from "../../services/stravaService";
 import { connectStravaWithPopup, STRAVA_STATUS_CHANGED } from "../../features/strava/connectWithPopup";
 import { authError } from "../../utils/authError";
+import {
+  formatMetricDisplayValue,
+  normalizeMetricInput,
+  normalizeTipo,
+  validateMetricValue,
+} from "../../utils/metricValueFormat";
+import {
+  activityNeedsCaloriesDetail,
+  applyStravaSelection,
+  extractStravaFieldValue,
+  resolveStravaAtividadeIdToSubmit,
+  valuesMatchForStrava,
+  type StravaMetaBaseline,
+  type StravaMetaFilled,
+} from "../../utils/stravaMapping";
 import type { StudentExecutionMetricDTO, StudentSessionMetricResult } from "../../types/studentArea";
-import type { StravaAtividade } from "../../types/strava";
+import type { StravaAtividade, StravaStatusResponse } from "../../types/strava";
 import "./StudentRpeModal.css";
 
 interface StudentRpeModalProps {
@@ -22,93 +38,17 @@ interface StudentRpeModalProps {
   onConfirm: (rpe: number | null, details?: StudentExecutionConfirmDetails) => void;
 }
 
-function normalizeMetricType(raw?: string): "NUMERICO" | "TEMPO" | "FREQUENCIA_CARDIACA" | "TEXTO" {
-  const up = (raw || "").toUpperCase();
-  if (up.includes("TEMPO")) return "TEMPO";
-  if (up.includes("FREQ") || up.includes("CARD")) return "FREQUENCIA_CARDIACA";
-  if (up.includes("TEXT") || up.includes("OBS")) return "TEXTO";
-  return "NUMERICO";
-}
-
-function metricTypeLabel(raw?: string): string {
-  const norm = normalizeMetricType(raw);
-  switch (norm) {
+function metricTypeFallbackLabel(tipo: string): string {
+  switch (normalizeTipo(tipo)) {
     case "TEMPO":
-      return "Tempo (mm:ss ou hh:mm:ss)";
+      return "Tempo";
     case "FREQUENCIA_CARDIACA":
-      return "Frequência cardíaca (bpm)";
+      return "Frequência cardíaca";
     case "TEXTO":
-      return "Texto / Observação";
+      return "Texto";
     default:
       return "Numérico";
   }
-}
-
-function metricPlaceholder(raw?: string): string {
-  const norm = normalizeMetricType(raw);
-  switch (norm) {
-    case "TEMPO":
-      return "Ex.: 01:42 ou 01:15:30";
-    case "FREQUENCIA_CARDIACA":
-      return "Ex.: 152 (entre 30 e 250)";
-    case "TEXTO":
-      return "Descreva o resultado ou observação...";
-    default:
-      return "Ex.: 60 ou 12,5";
-  }
-}
-
-function validateStudentMetricValue(metric: StudentExecutionMetricDTO, rawValue: string): string | null {
-  const trimmed = rawValue.trim();
-  if (!trimmed) {
-    if (metric.obrigatoria) {
-      return `A métrica '${metric.titulo}' é obrigatória e deve ser preenchida.`;
-    }
-    return null;
-  }
-
-  if (trimmed.length > 255) {
-    return `Valor inválido para a métrica ${metric.titulo}. Verifique o formato esperado (máx. 255 caracteres).`;
-  }
-
-  const norm = normalizeMetricType(metric.tipo);
-  if (norm === "NUMERICO") {
-    const validNum =
-      /^[+-]?(?:\d+(?:[.,]\d*)?|[.,]\d+)$/.test(trimmed) &&
-      Number.isFinite(Number(trimmed.replace(",", ".")));
-    if (!validNum) {
-      return `Valor inválido para a métrica ${metric.titulo}. Verifique o formato esperado: deve ser numérico.`;
-    }
-  } else if (norm === "TEMPO") {
-    if (!/^(?:\d+:[0-5]\d:[0-5]\d|\d+:[0-5]\d)$/.test(trimmed)) {
-      return `Valor inválido para a métrica ${metric.titulo}. Verifique o formato esperado: mm:ss ou hh:mm:ss (ex.: 01:42 ou 01:15:30).`;
-    }
-  } else if (norm === "FREQUENCIA_CARDIACA") {
-    const bpm = Number(trimmed);
-    if (!/^\d+$/.test(trimmed) || bpm < 30 || bpm > 250) {
-      return `Valor inválido para a métrica ${metric.titulo}. Verifique o formato esperado: entre 30 e 250 bpm.`;
-    }
-  }
-
-  return null;
-}
-
-function serializeStudentMetricValue(rawType: string, rawValue: string): string {
-  const trimmed = rawValue.trim();
-  const norm = normalizeMetricType(rawType);
-  if (norm === "TEMPO") {
-    const parts = trimmed.split(":");
-    if (parts.length === 3) {
-      const [h, m, s] = parts;
-      return `${(h || "0").padStart(2, "0")}:${(m || "0").padStart(2, "0")}:${s || "00"}`;
-    }
-    const [min, sec] = parts;
-    return `${(min || "0").padStart(2, "0")}:${sec || "00"}`;
-  }
-  if (norm === "NUMERICO") {
-    return trimmed.replace(",", ".");
-  }
-  return trimmed;
 }
 
 function formatStravaDate(isoDate?: string): string {
@@ -120,120 +60,9 @@ function formatStravaDate(isoDate?: string): string {
   return isoDate;
 }
 
-function mapStravaActivityToMetrics(
-  act: StravaAtividade,
-  allMetrics: StudentExecutionMetricDTO[]
-): {
-  dateReal: string;
-  duration: string;
-  metricValues: Record<string, string>;
-  stravaFilled: Record<string, boolean>;
-} {
-  const metricValues: Record<string, string> = {};
-  const stravaFilled: Record<string, boolean> = {};
-
-  for (const m of allMetrics) {
-    let val: string | null = null;
-    const campo = m.campoStrava;
-
-    // 1. Prioridade: Campo Strava explícito
-    if (campo && campo !== "NENHUM") {
-      switch (campo) {
-        case "DISTANCIA_KM":
-          if (act.distanciaKm != null) val = String(act.distanciaKm);
-          break;
-        case "DISTANCIA_METROS":
-          if (act.distanciaMetros != null) val = String(Math.round(act.distanciaMetros));
-          break;
-        case "TEMPO_MOVIMENTO":
-          if (act.tempoFormatado) val = act.tempoFormatado;
-          break;
-        case "TEMPO_TOTAL":
-          if (act.tempoTotalFormatado || act.tempoFormatado) val = act.tempoTotalFormatado || act.tempoFormatado || "";
-          break;
-        case "DURACAO_MINUTOS":
-          if (act.duracaoMinutos != null) val = String(act.duracaoMinutos);
-          break;
-        case "FREQUENCIA_CARDIACA_MEDIA":
-          if (act.frequenciaCardiacaMedia != null) val = String(act.frequenciaCardiacaMedia);
-          break;
-        case "FREQUENCIA_CARDIACA_MAXIMA":
-          if (act.frequenciaCardiacaMaxima != null) val = String(act.frequenciaCardiacaMaxima);
-          break;
-        case "CADENCIA_MEDIA":
-          if (act.cadenciaMedia != null) val = String(Math.round(act.cadenciaMedia));
-          break;
-        case "POTENCIA_MEDIA_WATTS":
-          if (act.potenciaMediaWatts != null) val = String(Math.round(act.potenciaMediaWatts));
-          break;
-        case "POTENCIA_MAXIMA_WATTS":
-          if (act.potenciaMaximaWatts != null) val = String(Math.round(act.potenciaMaximaWatts));
-          break;
-        case "ELEVACAO_GANHO_METROS":
-          if (act.elevacaoGanhoMetros != null) val = String(Math.round(act.elevacaoGanhoMetros));
-          break;
-        case "VELOCIDADE_MEDIA_KMH":
-          if (act.velocidadeMediaKmh != null) val = String(act.velocidadeMediaKmh);
-          break;
-        case "VELOCIDADE_MAXIMA_KMH":
-          if (act.velocidadeMaximaKmh != null) val = String(act.velocidadeMaximaKmh);
-          break;
-        case "CALORIAS":
-          if (act.calorias != null) val = String(Math.round(act.calorias));
-          break;
-        case "RITMO_MEDIO":
-          if (act.ritmoMedio) val = act.ritmoMedio;
-          break;
-      }
-    } else {
-      // 2. Fallback Heurístico para métricas legadas sem campo_strava
-      const norm = normalizeMetricType(m.tipo);
-      const titleLower = (m.titulo || "").toLowerCase();
-
-      if (norm === "FREQUENCIA_CARDIACA") {
-        if (act.frequenciaCardiacaMedia != null) val = String(act.frequenciaCardiacaMedia);
-      } else if (norm === "TEMPO") {
-        if (act.tempoFormatado) val = act.tempoFormatado;
-      } else if (norm === "NUMERICO") {
-        if (titleLower.includes("dist") || titleLower.includes("km") || titleLower.includes("quilometr")) {
-          if (act.distanciaKm != null) val = String(act.distanciaKm);
-        } else if (titleLower.includes("metro") && !titleLower.includes("km")) {
-          if (act.distanciaMetros != null) val = String(Math.round(act.distanciaMetros));
-        } else if (titleLower.includes("cadenc") || titleLower.includes("passo") || titleLower.includes("spm")) {
-          if (act.cadenciaMedia != null) val = String(Math.round(act.cadenciaMedia));
-        } else if (titleLower.includes("potenc") || titleLower.includes("watt")) {
-          if (act.potenciaMediaWatts != null) val = String(Math.round(act.potenciaMediaWatts));
-        } else if (titleLower.includes("calori") || titleLower.includes("kcal") || titleLower.includes("gasto")) {
-          if (act.calorias != null) val = String(Math.round(act.calorias));
-        } else if (titleLower.includes("elevac") || titleLower.includes("altimetri")) {
-          if (act.elevacaoGanhoMetros != null) val = String(Math.round(act.elevacaoGanhoMetros));
-        } else if (titleLower.includes("velocidad") || titleLower.includes("km/h")) {
-          if (act.velocidadeMediaKmh != null) val = String(act.velocidadeMediaKmh);
-        }
-      } else if (norm === "TEXTO") {
-        if (titleLower.includes("ritmo") || titleLower.includes("pace")) {
-          if (act.ritmoMedio) val = act.ritmoMedio;
-        }
-      }
-    }
-
-    if (val != null && val !== "") {
-      metricValues[m.id] = val;
-      stravaFilled[m.id] = true;
-    }
-  }
-
-  return {
-    dateReal: act.data || "",
-    duration: act.duracaoMinutos != null ? String(act.duracaoMinutos) : "",
-    metricValues,
-    stravaFilled
-  };
-}
-
 export default function StudentRpeModal({
   sessionId: propSessionId,
-  initialRpe = 7,
+  initialRpe = null,
   busy: externalBusy = false,
   onClose,
   onConfirm,
@@ -250,28 +79,55 @@ export default function StudentRpeModal({
     return null;
   }, [resolvedSessionId, studentCtx?.weeks]);
 
-  const [step, setStep] = useState<"metrics" | "rpe">("metrics");
+  const initialPlannedDuration = targetSession?.duracaoPlanejada
+    ? String(targetSession.duracaoPlanejada)
+    : "";
+  const todayIso = useMemo(() => localDateKey(new Date()), []);
+
   const [loadingForm, setLoadingForm] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [metrics, setMetrics] = useState<StudentExecutionMetricDTO[]>(
     () => targetSession?.metricas || []
   );
 
-  const todayIso = useMemo(() => localDateKey(new Date()), []);
   const [dateReal, setDateReal] = useState<string>(todayIso);
-  const [duration, setDuration] = useState<string>(() =>
-    String(targetSession?.duracaoPlanejada || 50)
-  );
+  const [duration, setDuration] = useState<string>(initialPlannedDuration);
   const [values, setValues] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string>("");
-  const [selectedRpe, setSelectedRpe] = useState<number | null>(initialRpe);
+  const [selectedRpe, setSelectedRpe] = useState<number | null>(initialRpe ?? null);
+
+  const [stravaStatus, setStravaStatus] = useState<StravaStatusResponse | null>(null);
+  const [stravaActivities, setStravaActivities] = useState<StravaAtividade[]>([]);
+  const [loadingStrava, setLoadingStrava] = useState<boolean>(false);
+  const [stravaListError, setStravaListError] = useState<string>("");
+  const [selectedStravaId, setSelectedStravaId] = useState<string | null>(null);
+  const [stravaFilledMap, setStravaFilledMap] = useState<Record<string, string>>({});
+  const [metaFilled, setMetaFilled] = useState<StravaMetaFilled>({});
+  const [loadingCaloriesDetail, setLoadingCaloriesDetail] = useState<boolean>(false);
+  const [stravaDetailWarning, setStravaDetailWarning] = useState<string>("");
+  const [connectingStrava, setConnectingStrava] = useState<boolean>(false);
+
+  const baselineRef = useRef<StravaMetaBaseline>({
+    dataReal: todayIso,
+    duracao: initialPlannedDuration,
+  });
+  const detailRequestedIdsRef = useRef<Set<string>>(new Set());
+  const valuesRef = useRef<Record<string, string>>(values);
+  valuesRef.current = values;
+  const stravaFilledRef = useRef<Record<string, string>>(stravaFilledMap);
+  stravaFilledRef.current = stravaFilledMap;
+  const metaFilledRef = useRef<StravaMetaFilled>(metaFilled);
+  metaFilledRef.current = metaFilled;
+  const dateRealRef = useRef<string>(dateReal);
+  dateRealRef.current = dateReal;
+  const durationRef = useRef<string>(duration);
+  durationRef.current = duration;
 
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const busy = externalBusy || submitting;
 
-  // Abre o dialog nativo
   useEffect(() => {
     const dialog = dialogRef.current;
     const previous = document.activeElement;
@@ -287,7 +143,6 @@ export default function StudentRpeModal({
     };
   }, []);
 
-  // Carrega o formulário de execução da sessão no back-end (US-22 C1)
   useEffect(() => {
     if (!resolvedSessionId) return;
     let active = true;
@@ -300,8 +155,13 @@ export default function StudentRpeModal({
         if (Array.isArray(form.metricas)) {
           setMetrics(form.metricas);
         }
-        if (form.sessao?.duracao) {
-          setDuration(String(form.sessao.duracao));
+        if (form.sessao?.duracao && form.sessao.duracao > 0) {
+          const nextPlanned = String(form.sessao.duracao);
+          const prevBaseline = baselineRef.current.duracao;
+          baselineRef.current = { ...baselineRef.current, duracao: nextPlanned };
+          if (!metaFilledRef.current.duracao && (!durationRef.current.trim() || durationRef.current === prevBaseline)) {
+            setDuration(nextPlanned);
+          }
         }
       })
       .catch((err: unknown) => {
@@ -330,13 +190,6 @@ export default function StudentRpeModal({
     [metrics]
   );
 
-  const [stravaConnected, setStravaConnected] = useState<boolean>(false);
-  const [stravaActivities, setStravaActivities] = useState<StravaAtividade[]>([]);
-  const [loadingStrava, setLoadingStrava] = useState<boolean>(false);
-  const [selectedStravaId, setSelectedStravaId] = useState<string | null>(null);
-  const [stravaFilledMap, setStravaFilledMap] = useState<Record<string, boolean>>({});
-  const [connectingStrava, setConnectingStrava] = useState<boolean>(false);
-
   async function handleConnectStravaFromModal() {
     try {
       setConnectingStrava(true);
@@ -349,33 +202,69 @@ export default function StudentRpeModal({
     }
   }
 
-  // Carrega status e atividades do Strava (US-14 / US-22)
+  function applyActivitySelection(act: StravaAtividade | null) {
+    const result = applyStravaSelection({
+      newActivity: act,
+      metrics,
+      actorRole: "ALUNO",
+      currentMetricValues: valuesRef.current,
+      prevStravaFilledMap: stravaFilledRef.current,
+      currentDataReal: dateRealRef.current,
+      currentDuracao: durationRef.current,
+      prevMetaFilled: metaFilledRef.current,
+      baseline: baselineRef.current,
+    });
+
+    setValues(result.nextMetricValues);
+    setStravaFilledMap(result.nextStravaFilledMap);
+    setDateReal(result.nextDataReal);
+    setDuration(result.nextDuracao);
+    setMetaFilled(result.nextMetaFilled);
+    setSelectedStravaId(result.selectedStravaActivityId);
+    setStravaDetailWarning("");
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next.dataReal;
+      delete next.duracao;
+      for (const id of Object.keys(result.nextStravaFilledMap)) {
+        delete next[id];
+      }
+      return next;
+    });
+  }
+
+  // Carrega status e atividades do Strava (limite=10, pré-seleciona acts[0])
   useEffect(() => {
     let active = true;
     async function initStrava(selectFirstActivity: boolean) {
       try {
         setLoadingStrava(true);
+        setStravaListError("");
         const status = await stravaService.obterStatus();
         if (!active) return;
+        setStravaStatus(status);
         if (status.conectado && !status.expirado) {
-          setStravaConnected(true);
           const acts = await stravaService.listarAtividades(10);
           if (!active) return;
           setStravaActivities(acts);
           if (selectFirstActivity && acts.length > 0) {
-            setSelectedStravaId(acts[0].id);
+            applyActivitySelection(acts[0]);
           }
         } else {
-          setStravaConnected(false);
+          setStravaActivities([]);
         }
-      } catch {
-        if (active) setStravaConnected(false);
+      } catch (err) {
+        if (active) {
+          setStravaListError(
+            authError(err, "Não foi possível consultar atividades do Strava.").message
+          );
+        }
       } finally {
         if (active) setLoadingStrava(false);
       }
     }
     function refreshStrava() {
-      void initStrava(false);
+      void initStrava(true);
     }
     void initStrava(true);
     window.addEventListener(STRAVA_STATUS_CHANGED, refreshStrava);
@@ -383,39 +272,114 @@ export default function StudentRpeModal({
       active = false;
       window.removeEventListener(STRAVA_STATUS_CHANGED, refreshStrava);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Preenche métricas quando uma atividade é selecionada ou as métricas chegam
-  useEffect(() => {
-    if (!selectedStravaId || stravaActivities.length === 0 || metrics.length === 0) return;
-    const act = stravaActivities.find((a) => a.id === selectedStravaId);
-    if (!act) return;
+  const selectedActivity = useMemo(
+    () => stravaActivities.find((a) => a.id === selectedStravaId) ?? null,
+    [stravaActivities, selectedStravaId]
+  );
 
-    const mapped = mapStravaActivityToMetrics(act, metrics);
-    if (mapped.dateReal) setDateReal(mapped.dateReal);
-    if (mapped.duration) setDuration(mapped.duration);
-    setValues((prev) => ({ ...prev, ...mapped.metricValues }));
-    setStravaFilledMap(mapped.stravaFilled);
-  }, [selectedStravaId, stravaActivities, metrics]);
+  // Sincroniza novas métricas quando o formulário chega após o Strava (ou ao enriquecer detalhes)
+  useEffect(() => {
+    if (!selectedActivity || metrics.length === 0) return;
+
+    const updates: Record<string, string> = {};
+    const filledAdditions: Record<string, string> = {};
+
+    for (const m of metrics) {
+      if (stravaFilledRef.current[m.id]) continue;
+      if ((valuesRef.current[m.id] || "").trim()) continue;
+      const extracted = extractStravaFieldValue(selectedActivity, m);
+      if (extracted != null) {
+        updates[m.id] = extracted;
+        filledAdditions[m.id] = extracted;
+      }
+    }
+
+    if (Object.keys(updates).length > 0) {
+      setValues((prev) => ({ ...prev, ...updates }));
+      setStravaFilledMap((prev) => ({ ...prev, ...filledAdditions }));
+      setErrors((prev) => {
+        const next = { ...prev };
+        for (const id of Object.keys(updates)) {
+          delete next[id];
+        }
+        return next;
+      });
+    }
+  }, [selectedActivity, metrics]);
+
+  // Busca on-demand para CALORIAS quando ausente no resumo da atividade (OQ1 + fallback 429)
+  useEffect(() => {
+    if (!selectedActivity || metrics.length === 0) return;
+    if (!activityNeedsCaloriesDetail(selectedActivity, metrics, "ALUNO")) return;
+    if (detailRequestedIdsRef.current.has(selectedActivity.id)) return;
+
+    let active = true;
+    detailRequestedIdsRef.current.add(selectedActivity.id);
+    setLoadingCaloriesDetail(true);
+    setStravaDetailWarning("");
+
+    stravaService
+      .obterDetalheAtividade(selectedActivity.id)
+      .then((detail) => {
+        if (!active) return;
+        setStravaActivities((prev) =>
+          prev.map((item) => (item.id === detail.id ? { ...item, ...detail } : item))
+        );
+        if (detail.calorias != null) {
+          const updates: Record<string, string> = {};
+          const filledAdditions: Record<string, string> = {};
+          for (const m of metrics) {
+            if (m.campoStrava !== "CALORIAS") continue;
+            const currentVal = valuesRef.current[m.id];
+            const prevStravaVal = stravaFilledRef.current[m.id];
+            if (!currentVal?.trim() || (prevStravaVal && valuesMatchForStrava(currentVal, prevStravaVal, m))) {
+              const extracted = extractStravaFieldValue(detail, m);
+              if (extracted != null) {
+                updates[m.id] = extracted;
+                filledAdditions[m.id] = extracted;
+              }
+            }
+          }
+          if (Object.keys(updates).length > 0) {
+            setValues((prev) => ({ ...prev, ...updates }));
+            setStravaFilledMap((prev) => ({ ...prev, ...filledAdditions }));
+          }
+        }
+      })
+      .catch((err) => {
+        if (!active) return;
+        if (axios.isAxiosError(err) && err.response?.status === 429) {
+          setStravaDetailWarning(
+            "Limite de requisições do Strava atingido ao buscar calorias detalhadas. As demais métricas foram mantidas; informe calorias manualmente se necessário."
+          );
+        } else {
+          setStravaDetailWarning(
+            "Não foi possível obter calorias detalhadas desta atividade no Strava agora. Você pode informar manualmente."
+          );
+        }
+      })
+      .finally(() => {
+        if (active) setLoadingCaloriesDetail(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [selectedActivity, metrics]);
 
   function handleSelectStravaActivity(actId: string) {
     if (!actId) {
-      setSelectedStravaId(null);
-      setStravaFilledMap({});
+      applyActivitySelection(null);
       return;
     }
-    setSelectedStravaId(actId);
-    const act = stravaActivities.find((a) => a.id === actId);
-    if (act && metrics.length > 0) {
-      const mapped = mapStravaActivityToMetrics(act, metrics);
-      if (mapped.dateReal) setDateReal(mapped.dateReal);
-      if (mapped.duration) setDuration(mapped.duration);
-      setValues((prev) => ({ ...prev, ...mapped.metricValues }));
-      setStravaFilledMap(mapped.stravaFilled);
-    }
+    const act = stravaActivities.find((a) => a.id === actId) ?? null;
+    applyActivitySelection(act);
   }
 
-  function validateStepOne(): boolean {
+  function validateForm(): boolean {
     const nextErrors: Record<string, string> = {};
 
     if (
@@ -426,39 +390,35 @@ export default function StudentRpeModal({
     }
 
     if (duration.trim()) {
-      const durNum = Number(duration);
-      if (!/^\d+$/.test(duration.trim()) || durNum < 1) {
-        nextErrors.duracao = "A duração real deve ser no mínimo 1 minuto.";
+      const durNum = Number(duration.trim());
+      if (!/^\d+$/.test(duration.trim()) || durNum < 1 || durNum > 1440) {
+        nextErrors.duracao = "A duração real deve estar entre 1 e 1440 minutos.";
       }
     }
 
     for (const metric of studentMetrics) {
-      const msg = validateStudentMetricValue(metric, values[metric.id] || "");
+      const rawVal = values[metric.id] || "";
+      if (!rawVal.trim()) {
+        if (metric.obrigatoria) {
+          nextErrors[metric.id] = `A métrica '${metric.titulo}' é obrigatória e deve ser preenchida.`;
+        }
+        continue;
+      }
+      const msg = validateMetricValue(metric.tipo, rawVal, metric.unidade, metric.campoStrava);
       if (msg) {
         nextErrors[metric.id] = msg;
       }
     }
 
     setErrors(nextErrors);
-    if (formError) {
-      return false;
-    }
     setFormError("");
     return Object.keys(nextErrors).length === 0;
   }
 
-  function handleContinueToRpe(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!validateStepOne()) return;
-    setStep("rpe");
-  }
-
-  async function handleFinalize(rpeToSave: number | null) {
     if (busy) return;
-    if (!validateStepOne()) {
-      setStep("metrics");
-      return;
-    }
+    if (!validateForm()) return;
 
     const duracaoNum = duration.trim() ? Number(duration.trim()) : null;
     const filledMetrics = studentMetrics.filter((m) => (values[m.id] || "").trim().length > 0);
@@ -470,20 +430,33 @@ export default function StudentRpeModal({
 
     const payloadResultados = allMetricsToSave.map((m) => ({
       metricaId: m.id,
-      valor: serializeStudentMetricValue(m.tipo, values[m.id]),
+      valor: normalizeMetricInput(m.tipo, values[m.id], m.unidade, m.campoStrava),
     }));
 
     const localResults: StudentSessionMetricResult[] = allMetricsToSave.map((m) => ({
       metricaId: m.id,
       titulo: m.titulo,
       tipo: m.tipo,
-      valor: serializeStudentMetricValue(m.tipo, values[m.id]),
+      unidade: m.unidade ?? null,
+      valor: normalizeMetricInput(m.tipo, values[m.id], m.unidade, m.campoStrava),
     }));
 
+    const stravaAtividadeIdToSubmit = resolveStravaAtividadeIdToSubmit({
+      selectedActivityId: selectedStravaId,
+      metrics,
+      currentMetricValues: values,
+      stravaFilledMap,
+      currentDataReal: dateReal,
+      currentDuracao: duration,
+      metaFilled,
+      baseline: baselineRef.current,
+    });
+
     if (!resolvedSessionId) {
-      onConfirm(rpeToSave, {
+      onConfirm(selectedRpe, {
         dataReal: dateReal,
         duracao: duracaoNum,
+        stravaAtividadeId: stravaAtividadeIdToSubmit,
         resultados: localResults,
       });
       return;
@@ -495,13 +468,15 @@ export default function StudentRpeModal({
       await alunoService.registrarExecucao(resolvedSessionId, {
         dataReal: dateReal,
         duracao: duracaoNum,
-        nivelCansaco: rpeToSave,
+        nivelCansaco: selectedRpe,
+        stravaAtividadeId: stravaAtividadeIdToSubmit,
         resultados: payloadResultados,
       });
 
-      onConfirm(rpeToSave, {
+      onConfirm(selectedRpe, {
         dataReal: dateReal,
         duracao: duracaoNum,
+        stravaAtividadeId: stravaAtividadeIdToSubmit,
         resultados: localResults,
         alreadySavedOnBackend: true,
       });
@@ -509,11 +484,9 @@ export default function StudentRpeModal({
       if (axios.isAxiosError(err) && err.response?.data?.invalidFields) {
         const backendFields = err.response.data.invalidFields as Record<string, string>;
         setErrors(backendFields);
-        setStep("metrics");
       }
       setFormError(
-        authError(err, "Não foi possível finalizar a sessão. Verifique os campos informados.")
-          .message
+        authError(err, "Não foi possível finalizar a sessão. Verifique os campos informados.").message
       );
     } finally {
       setSubmitting(false);
@@ -521,6 +494,8 @@ export default function StudentRpeModal({
   }
 
   const borgInfo = getBorgInfo(selectedRpe);
+  const isConnectedActive = Boolean(stravaStatus?.conectado && !stravaStatus?.expirado);
+  const isExpired = Boolean(stravaStatus?.conectado && stravaStatus?.expirado);
 
   const handleBackdropClick = (event: React.MouseEvent<HTMLDialogElement>) => {
     if (busy) return;
@@ -551,27 +526,14 @@ export default function StudentRpeModal({
     >
       <div className="student-rpe-modal__header">
         <span className="student-rpe-modal__icon" aria-hidden="true">
-          <img
-            src={
-              step === "rpe"
-                ? "/student-profile/imgIconFlame.svg"
-                : "/student-profile/imgIconActivity2.svg"
-            }
-            alt=""
-          />
+          <img src="/student-profile/imgIconActivity2.svg" alt="" />
         </span>
         <div className="student-rpe-modal__titles">
-          <h2 id={titleId}>
-            {step === "metrics"
-              ? "Finalizar sessão e enviar métricas"
-              : "Como você avalia seu nível de esforço nesta sessão?"}
-          </h2>
+          <h2 id={titleId}>Finalizar sessão e registrar treino</h2>
           <p>
-            {step === "metrics"
-              ? targetSession
-                ? `${targetSession.titulo} · Planejada para ${targetSession.dataPlanejada}`
-                : "Preencha os resultados solicitados pelo seu personal trainer"
-              : "Escala de Borg CR-10 (1 a 10) · campo opcional"}
+            {targetSession
+              ? `${targetSession.titulo} · Planejada para ${targetSession.dataPlanejada}`
+              : "Importe do Strava ou preencha métricas e esforço percebido"}
           </p>
         </div>
         <button
@@ -591,373 +553,270 @@ export default function StudentRpeModal({
         </div>
       )}
 
-      {step === "metrics" ? (
-        <form className="student-rpe-modal__form" onSubmit={handleContinueToRpe} noValidate>
-          {/* Sincronização com Strava (US-14 / US-22) */}
-          {stravaConnected && (
-            <div
-              className="student-rpe-modal__strava-box"
-              style={{
-                background: "#f8fafc",
-                border: "1px solid #e2e8f0",
-                borderRadius: "8px",
-                padding: "12px 14px",
-                marginBottom: "16px",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  marginBottom: "8px",
-                }}
-              >
-                <span
-                  style={{
-                    fontWeight: 600,
-                    fontSize: "0.875rem",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    color: "#0f172a",
-                  }}
-                >
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="#fc5200" aria-hidden="true">
-                    <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7.008 13.828h4.172" />
-                  </svg>
-                  Sincronizar com atividade do Strava
-                </span>
-                {selectedStravaId && (
-                  <span
-                    style={{
-                      fontSize: "0.75rem",
-                      background: "rgba(252, 82, 0, 0.1)",
-                      color: "#fc5200",
-                      padding: "2px 8px",
-                      borderRadius: "12px",
-                      fontWeight: 600,
-                    }}
-                  >
-                    Atividade vinculada
-                  </span>
-                )}
-              </div>
-
-              {loadingStrava ? (
-                <p style={{ fontSize: "0.8125rem", color: "#64748b", margin: 0 }}>
-                  Carregando atividades recentes do Strava...
-                </p>
-              ) : stravaActivities.length > 0 ? (
-                <div style={{ margin: 0 }}>
-                  <label
-                    htmlFor="strava-activity-select"
-                    style={{
-                      display: "block",
-                      fontSize: "0.75rem",
-                      color: "#64748b",
-                      marginBottom: "4px",
-                    }}
-                  >
-                    Escolha a atividade para preencher os dados automaticamente:
-                  </label>
-                  <select
-                    id="strava-activity-select"
-                    value={selectedStravaId || ""}
-                    onChange={(e) => handleSelectStravaActivity(e.target.value)}
-                    disabled={busy}
-                    style={{
-                      width: "100%",
-                      padding: "8px 10px",
-                      borderRadius: "6px",
-                      border: "1px solid #cbd5e1",
-                      fontSize: "0.875rem",
-                      background: "#fff",
-                      color: "#0f172a",
-                    }}
-                  >
-                    {stravaActivities.map((act) => (
-                      <option key={act.id} value={act.id}>
-                        {act.esporte || act.tipo}: {act.nome} — {formatStravaDate(act.data)} ({act.distanciaFormatada || (act.distanciaKm ? `${act.distanciaKm} km` : "")} {act.tempoFormatado ? `· ${act.tempoFormatado}` : ""})
-                      </option>
-                    ))}
-                    <option value="">Não importar do Strava (Preencher manualmente)</option>
-                  </select>
-                </div>
-              ) : (
-                <p style={{ fontSize: "0.8125rem", color: "#64748b", margin: 0 }}>
-                  Nenhuma atividade recente encontrada no Strava.
-                </p>
-              )}
-            </div>
-          )}
-
-          {!stravaConnected && !loadingStrava && (
-            <div
-              className="student-rpe-modal__strava-box"
-              style={{
-                background: "#f8fafc",
-                border: "1px dashed #cbd5e1",
-                borderRadius: "8px",
-                padding: "10px 14px",
-                marginBottom: "16px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: "12px",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.8125rem", color: "#475569" }}>
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="#fc5200" aria-hidden="true" style={{ flexShrink: 0 }}>
+      <form className="student-rpe-modal__form" onSubmit={handleSubmit} noValidate>
+        {/* 1. Strava */}
+        {loadingStrava ? (
+          <div className="student-rpe-modal__strava-box">
+            <p className="student-rpe-modal__strava-muted">
+              Consultando atividades recentes do Strava...
+            </p>
+          </div>
+        ) : isConnectedActive ? (
+          <div className="student-rpe-modal__strava-box">
+            <div className="student-rpe-modal__strava-head">
+              <span className="student-rpe-modal__strava-title">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="#fc5200" aria-hidden="true">
                   <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7.008 13.828h4.172" />
                 </svg>
-                <span>Conecte o <strong>Strava</strong> para preencher métricas deste treino automaticamente.</span>
+                Sincronizar com atividade do Strava
+              </span>
+              {selectedStravaId && (
+                <span className="student-rpe-modal__strava-chip">Atividade vinculada</span>
+              )}
+            </div>
+
+            {stravaListError ? (
+              <p className="student-rpe-modal__strava-warn" role="alert">
+                {stravaListError}
+              </p>
+            ) : stravaActivities.length > 0 ? (
+              <div className="student-rpe-modal__strava-control">
+                <label htmlFor="strava-activity-select">
+                  Escolha a atividade para preencher os dados automaticamente:
+                </label>
+                <select
+                  id="strava-activity-select"
+                  value={selectedStravaId || ""}
+                  onChange={(e) => handleSelectStravaActivity(e.target.value)}
+                  disabled={busy}
+                >
+                  {stravaActivities.map((act) => (
+                    <option key={act.id} value={act.id}>
+                      {act.esporte || act.tipo}: {act.nome} — {formatStravaDate(act.data)}{" "}
+                      ({act.distanciaFormatada || (act.distanciaKm ? `${act.distanciaKm} km` : "")}
+                      {act.tempoFormatado ? ` · ${act.tempoFormatado}` : ""})
+                    </option>
+                  ))}
+                  <option value="">Não importar do Strava (preencher manualmente)</option>
+                </select>
+                {loadingCaloriesDetail && (
+                  <p className="student-rpe-modal__strava-muted">
+                    Buscando calorias detalhadas no Strava...
+                  </p>
+                )}
+                {stravaDetailWarning && (
+                  <p className="student-rpe-modal__strava-warn" role="status">
+                    {stravaDetailWarning}
+                  </p>
+                )}
               </div>
+            ) : (
+              <p className="student-rpe-modal__strava-muted">
+                Nenhuma atividade recente encontrada no Strava.
+              </p>
+            )}
+          </div>
+        ) : isExpired ? (
+          <div className="student-rpe-modal__strava-box student-rpe-modal__strava-box--expired" role="alert">
+            <div className="student-rpe-modal__strava-prompt">
+              <span>
+                <strong>Conexão Strava expirada.</strong> Reconecte sua conta para importar
+                atividades automaticamente.
+              </span>
               <button
                 type="button"
+                className="student-rpe-modal__strava-link"
                 disabled={connectingStrava}
                 onClick={handleConnectStravaFromModal}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "#fc5200",
-                  fontWeight: 600,
-                  fontSize: "0.8125rem",
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                  textDecoration: "underline",
-                }}
+              >
+                {connectingStrava ? "Aguardando autorização..." : "Reconectar Strava →"}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="student-rpe-modal__strava-box student-rpe-modal__strava-box--dashed">
+            <div className="student-rpe-modal__strava-prompt">
+              <span className="student-rpe-modal__strava-invite">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="#fc5200" aria-hidden="true">
+                  <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7.008 13.828h4.172" />
+                </svg>
+                <span>
+                  Conecte o <strong>Strava</strong> para preencher métricas deste treino
+                  automaticamente.
+                </span>
+              </span>
+              <button
+                type="button"
+                className="student-rpe-modal__strava-link"
+                disabled={connectingStrava}
+                onClick={handleConnectStravaFromModal}
               >
                 {connectingStrava ? "Aguardando autorização..." : "Conectar Strava →"}
               </button>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* Data real e duração (US-22 C7) */}
-          <div className="student-rpe-modal__row-2">
-            <div className="student-rpe-modal__field">
-              <label htmlFor="student-exec-date">Data de realização *</label>
-              <input
-                id="student-exec-date"
-                type="date"
-                value={dateReal}
-                max={todayIso}
-                disabled={busy}
-                onChange={(e) => {
-                  setDateReal(e.target.value);
-                  setErrors((prev) => ({ ...prev, dataReal: "" }));
-                }}
-                className={errors.dataReal ? "has-error" : ""}
-              />
-              {errors.dataReal && (
-                <span className="student-rpe-modal__field-error">{errors.dataReal}</span>
-              )}
-            </div>
-
-            <div className="student-rpe-modal__field">
-              <label htmlFor="student-exec-duration">Duração real (minutos)</label>
-              <input
-                id="student-exec-duration"
-                type="number"
-                min={1}
-                step={1}
-                placeholder="Ex.: 45"
-                value={duration}
-                disabled={busy}
-                onChange={(e) => {
-                  setDuration(e.target.value);
-                  setErrors((prev) => ({ ...prev, duracao: "" }));
-                }}
-                className={errors.duracao ? "has-error" : ""}
-              />
-              {errors.duracao && (
-                <span className="student-rpe-modal__field-error">{errors.duracao}</span>
-              )}
-            </div>
+        {/* 2. Data real e duração */}
+        <div className="student-rpe-modal__row-2">
+          <div className="student-rpe-modal__field">
+            <label htmlFor="student-exec-date">Data de realização *</label>
+            <input
+              id="student-exec-date"
+              type="date"
+              value={dateReal}
+              max={todayIso}
+              disabled={busy}
+              onChange={(e) => {
+                setDateReal(e.target.value);
+                setErrors((prev) => ({ ...prev, dataReal: "" }));
+              }}
+              className={errors.dataReal ? "has-error" : ""}
+            />
+            {errors.dataReal && (
+              <span className="student-rpe-modal__field-error" role="alert">
+                {errors.dataReal}
+              </span>
+            )}
           </div>
 
-          {/* Métricas solicitadas pelo personal (US-13 / US-22) */}
-          <div className="student-rpe-modal__metrics-section">
-            <div className="student-rpe-modal__metrics-head">
-              <strong>Métricas solicitadas pelo personal</strong>
-              <span>Preencha os resultados alcançados no treino</span>
-            </div>
+          <div className="student-rpe-modal__field">
+            <label htmlFor="student-exec-duration">Duração real (minutos)</label>
+            <input
+              id="student-exec-duration"
+              type="number"
+              min={1}
+              max={1440}
+              step={1}
+              placeholder="Ex.: 45"
+              value={duration}
+              disabled={busy}
+              onChange={(e) => {
+                setDuration(e.target.value);
+                setErrors((prev) => ({ ...prev, duracao: "" }));
+              }}
+              className={errors.duracao ? "has-error" : ""}
+            />
+            {errors.duracao && (
+              <span className="student-rpe-modal__field-error" role="alert">
+                {errors.duracao}
+              </span>
+            )}
+          </div>
+        </div>
 
-            {loadingForm && metrics.length === 0 ? (
-              <p className="student-rpe-modal__empty-metrics">Carregando métricas da sessão...</p>
-            ) : studentMetrics.length === 0 ? (
-              <p className="student-rpe-modal__empty-metrics">
-                Nenhuma métrica de preenchimento do aluno para esta sessão. Clique em continuar para
-                informar seu nível de esforço (RPE) e concluir.
-              </p>
-            ) : (
-              <div className="student-rpe-modal__metrics-list">
-                {studentMetrics.map((metric) => {
-                  const fieldId = `student-metric-${metric.id}`;
-                  const normType = normalizeMetricType(metric.tipo);
-                  const errMsg = errors[metric.id];
+        {/* 3. Métricas solicitadas pelo personal */}
+        <div className="student-rpe-modal__metrics-section">
+          <div className="student-rpe-modal__metrics-head">
+            <strong>Métricas da sessão</strong>
+            <span>Preencha os resultados alcançados no treino</span>
+          </div>
 
-                  return (
-                    <div key={metric.id} className="student-rpe-modal__metric-item">
-                      <div className="student-rpe-modal__metric-label-row">
-                        <label htmlFor={fieldId}>
-                          {metric.titulo}
-                          {metric.obrigatoria ? " *" : ""}
-                        </label>
-                        <div className="student-rpe-modal__metric-badges">
-                          {stravaFilledMap[metric.id] && (
-                            <span
-                              style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: "4px",
-                                background: "rgba(252, 82, 0, 0.1)",
-                                color: "#fc5200",
-                                padding: "2px 6px",
-                                borderRadius: "4px",
-                                fontSize: "0.75rem",
-                                fontWeight: 600,
-                              }}
-                            >
-                              <svg viewBox="0 0 24 24" width="10" height="10" fill="#fc5200" aria-hidden="true">
-                                <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7.008 13.828h4.172" />
-                              </svg>
-                              Strava
-                            </span>
-                          )}
-                          <span className="student-rpe-modal__metric-type">
-                            {metricTypeLabel(metric.tipo)}
-                          </span>
-                          <Badge tone={metric.obrigatoria ? "warning" : "neutral"}>
-                            {metric.obrigatoria ? "Obrigatória" : "Opcional"}
-                          </Badge>
-                        </div>
-                      </div>
+          {loadingForm && metrics.length === 0 ? (
+            <p className="student-rpe-modal__empty-metrics">Carregando métricas da sessão...</p>
+          ) : studentMetrics.length === 0 ? (
+            <p className="student-rpe-modal__empty-metrics">
+              Nenhuma métrica de preenchimento do aluno para esta sessão.
+            </p>
+          ) : (
+            <div className="student-rpe-modal__metrics-list">
+              {studentMetrics.map((metric) => {
+                const fieldId = `student-metric-${metric.id}`;
+                const errMsg = errors[metric.id];
+                const isFromStrava = Boolean(
+                  stravaFilledMap[metric.id] &&
+                    valuesMatchForStrava(values[metric.id], stravaFilledMap[metric.id], metric)
+                );
 
-                      {metric.obrigatoria && !values[metric.id] && selectedStravaId && (
-                        <span style={{ fontSize: "0.75rem", color: "#d97706", display: "block", marginBottom: "6px" }}>
-                          Não detectada no Strava nesta atividade — informe manualmente.
+                return (
+                  <div key={metric.id} className="student-rpe-modal__metric-item">
+                    <div className="student-rpe-modal__metric-label-row">
+                      <label htmlFor={fieldId}>
+                        {metric.titulo}
+                        {metric.obrigatoria ? " *" : ""}
+                      </label>
+                      <div className="student-rpe-modal__metric-badges">
+                        <span className="student-rpe-modal__metric-type">
+                          {metric.unidade?.trim()
+                            ? metric.unidade
+                            : metricTypeFallbackLabel(metric.tipo)}
                         </span>
-                      )}
+                        <Badge tone={metric.obrigatoria ? "warning" : "neutral"}>
+                          {metric.obrigatoria ? "Obrigatória" : "Opcional"}
+                        </Badge>
+                      </div>
+                    </div>
 
-                      {normType === "TEXTO" ? (
-                        <textarea
-                          id={fieldId}
-                          rows={2}
-                          maxLength={255}
-                          placeholder={metricPlaceholder(metric.tipo)}
-                          value={values[metric.id] || ""}
-                          disabled={busy}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setValues((prev) => ({ ...prev, [metric.id]: val }));
-                            setErrors((prev) => ({ ...prev, [metric.id]: "" }));
-                          }}
-                          className={errMsg ? "has-error" : ""}
-                        />
-                      ) : (
-                        <input
-                          id={fieldId}
-                          type="text"
-                          maxLength={255}
-                          placeholder={metricPlaceholder(metric.tipo)}
-                          value={values[metric.id] || ""}
-                          disabled={busy}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setValues((prev) => ({ ...prev, [metric.id]: val }));
-                            setErrors((prev) => ({ ...prev, [metric.id]: "" }));
-                          }}
-                          className={errMsg ? "has-error" : ""}
-                        />
-                      )}
+                    {metric.obrigatoria && !values[metric.id] && selectedStravaId && (
+                      <span className="student-rpe-modal__strava-missing-hint">
+                        Não detectada no Strava nesta atividade — informe manualmente.
+                      </span>
+                    )}
 
-                      {errMsg && (
+                    <MetricValueInput
+                      id={fieldId}
+                      ariaLabel={metric.titulo}
+                      value={values[metric.id] || ""}
+                      tipo={metric.tipo}
+                      unidade={metric.unidade}
+                      campoStrava={metric.campoStrava}
+                      disabled={busy}
+                      error={errMsg}
+                      fromStrava={isFromStrava}
+                      onChange={(nextVal) => {
+                        setValues((prev) => ({ ...prev, [metric.id]: nextVal }));
+                        setErrors((prev) => ({ ...prev, [metric.id]: "" }));
+                      }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {personalOnlyMetrics.length > 0 && (
+            <div className="student-rpe-modal__personal-metrics-note">
+              <strong>Métricas avaliadas pelo Personal Trainer:</strong>
+              <div className="student-rpe-modal__personal-metrics-list">
+                {personalOnlyMetrics.map((m) => {
+                  const stravaVal = values[m.id];
+                  const personalErr = errors[m.id];
+                  return (
+                    <div key={m.id} className="student-rpe-modal__personal-metric-wrapper">
+                      <div className="student-rpe-modal__personal-metric-row">
+                        <span>
+                          {m.titulo} {m.obrigatoria ? <span className="is-required">*</span> : ""}
+                        </span>
+                        {stravaVal ? (
+                          <span className="student-rpe-modal__personal-strava-val">
+                            Strava: {formatMetricDisplayValue(stravaVal, m.tipo, m.unidade)} (Automático)
+                          </span>
+                        ) : (
+                          <span className="student-rpe-modal__personal-pending">
+                            Pendente para o personal
+                          </span>
+                        )}
+                      </div>
+                      {personalErr && (
                         <span className="student-rpe-modal__field-error" role="alert">
-                          {errMsg}
+                          {personalErr}
                         </span>
                       )}
                     </div>
                   );
                 })}
               </div>
-            )}
+            </div>
+          )}
+        </div>
 
-            {personalOnlyMetrics.length > 0 && (
-              <div
-                className="student-rpe-modal__personal-metrics-note"
-                style={{
-                  marginTop: "16px",
-                  padding: "12px",
-                  background: "#f8fafc",
-                  borderRadius: "8px",
-                  border: "1px solid #e2e8f0",
-                }}
-              >
-                <strong style={{ display: "block", marginBottom: "6px" }}>
-                  Métricas avaliadas pelo Personal Trainer:
-                </strong>
-                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                  {personalOnlyMetrics.map((m) => {
-                    const stravaVal = values[m.id];
-                    return (
-                      <div
-                        key={m.id}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          fontSize: "0.875rem",
-                        }}
-                      >
-                        <span>
-                          {m.titulo} {m.obrigatoria ? <span style={{ color: "#ef4444" }}>*</span> : ""}
-                        </span>
-                        {stravaVal ? (
-                          <span
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "6px",
-                              background: "#ecfdf5",
-                              color: "#065f46",
-                              padding: "2px 8px",
-                              borderRadius: "4px",
-                              fontWeight: 600,
-                              fontSize: "0.8125rem",
-                            }}
-                          >
-                            Strava: {stravaVal} (Automático)
-                          </span>
-                        ) : (
-                          <span style={{ color: "#64748b", fontSize: "0.8125rem" }}>
-                            Pendente para o personal
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+        {/* 4. RPE inline (opcional) */}
+        <div className="student-rpe-modal__rpe-section">
+          <div className="student-rpe-modal__rpe-header">
+            <strong>Percepção de esforço — Borg CR-10 (opcional)</strong>
+            <span>Selecione de 1 a 10 ou deixe sem seleção para enviar sem RPE</span>
           </div>
 
-          <footer className="student-rpe-modal__footer">
-            <button
-              type="button"
-              className="student-rpe-modal__skip"
-              disabled={busy}
-              onClick={onClose}
-            >
-              Cancelar
-            </button>
-            <Button type="submit" disabled={busy}>
-              Continuar para esforço (RPE) →
-            </Button>
-          </footer>
-        </form>
-      ) : (
-        <>
           <div
             className="student-rpe-modal__scale-buttons"
             role="group"
@@ -983,7 +842,7 @@ export default function StudentRpeModal({
                   }`}
                   aria-pressed={isSelected}
                   disabled={busy}
-                  onClick={() => setSelectedRpe(level)}
+                  onClick={() => setSelectedRpe(isSelected ? null : level)}
                 >
                   {level}
                 </button>
@@ -1008,34 +867,24 @@ export default function StudentRpeModal({
               <p>{borgInfo.description}</p>
             </div>
           </div>
+        </div>
 
-          <footer className="student-rpe-modal__footer student-rpe-modal__footer--between">
-            <button
-              type="button"
-              className="student-rpe-modal__skip"
-              disabled={busy}
-              onClick={() => setStep("metrics")}
-            >
-              ← Voltar às métricas
-            </button>
+        {/* 5. Envio */}
+        <footer className="student-rpe-modal__footer student-rpe-modal__footer--between">
+          <button
+            type="button"
+            className="student-rpe-modal__skip"
+            disabled={busy}
+            onClick={onClose}
+          >
+            Cancelar
+          </button>
 
-            <div className="student-rpe-modal__footer-right">
-              <button
-                type="button"
-                className="student-rpe-modal__skip"
-                disabled={busy}
-                onClick={() => void handleFinalize(null)}
-              >
-                Pular esforço
-              </button>
-              <Button loading={busy} onClick={() => void handleFinalize(selectedRpe)}>
-                Finalizar sessão
-              </Button>
-            </div>
-          </footer>
-        </>
-      )}
+          <Button type="submit" loading={busy}>
+            Finalizar sessão
+          </Button>
+        </footer>
+      </form>
     </dialog>
   );
 }
-

@@ -5,6 +5,7 @@ import { modalidadeService } from "../../services/modalidadeService";
 import type { MetricaResponseDTO } from "../../types/metric";
 import type { ModalidadeResponseDTO } from "../../types/modalidade";
 import { handleApiError } from "../../utils/handleApiError";
+import { stripDuplicateUnitSuffix } from "../../utils/metricValueFormat";
 import {
   filterMetrics,
   getMarketMetricPresets,
@@ -328,6 +329,7 @@ export const Metrics: React.FC = () => {
         id: p.presetId,
         titulo: p.titulo,
         tipo: p.tipo,
+        unidade: p.unidade ?? null,
         modalidadeId: p.modalidadeId,
         nomeModalidade: p.nomeModalidade,
       }));
@@ -362,8 +364,8 @@ export const Metrics: React.FC = () => {
         prev
           .map((m) => {
             if (m.id === deletedId) {
-              if (getMetricStudentCount(m) > 0) {
-                return { ...m, descontinuada: true, ativo: false };
+              if (m.possuiHistorico || getMetricStudentCount(m) > 0) {
+                return { ...m, ativo: false };
               }
               return null;
             }
@@ -378,14 +380,15 @@ export const Metrics: React.FC = () => {
       id: "",
       titulo: preset.titulo,
       tipo: preset.tipo,
+      unidade: preset.unidade ?? null,
       modalidadeId: preset.modalidadeId,
       nomeModalidade: preset.nomeModalidade,
       obrigatoria: preset.obrigatoria,
       quemPreenche: preset.quemPreenche,
       campoStrava: preset.campoStrava,
       ativo: true,
-      descontinuada: false,
-      quantidadeAlunosComRegistro: 0,
+      possuiHistorico: false,
+      quantidadeAlunosComRegistros: 0,
     });
   }
 
@@ -831,7 +834,7 @@ export const Metrics: React.FC = () => {
                       <tr key={preset.presetId}>
                         <td className="metrics-page__col-metric">
                           <div className="metrics-page__metric-head">
-                            <h3>{preset.titulo}</h3>
+                            <h3>{stripDuplicateUnitSuffix(preset.titulo, preset.unidade)}</h3>
                           </div>
                           <p className="metrics-page__preset-desc">{preset.descricao}</p>
                           <div className="metrics-page__meta-pills">
@@ -863,7 +866,7 @@ export const Metrics: React.FC = () => {
                               <span>{typeStyle.label}</span>
                             </span>
                             <span className="metrics-page__type-hint">
-                              {typeStyle.unitHint}
+                              {preset.unidade || typeStyle.unitHint}
                             </span>
                           </div>
                         </td>
@@ -1013,6 +1016,7 @@ export const Metrics: React.FC = () => {
               <tbody>
                 {paginatedMetrics.items.map((metrica) => {
                   const studentCount = getMetricStudentCount(metrica);
+                  const hasHistory = Boolean(metrica.possuiHistorico ?? (studentCount > 0));
                   const active = isMetricActive(metrica);
                   const normTipo = normalizeTipo(metrica.tipo);
                   const typeStyle = getMetricTypeBadgeStyle(metrica.tipo);
@@ -1025,6 +1029,7 @@ export const Metrics: React.FC = () => {
                   const stravaLabel = getStravaFieldLabel(metrica.campoStrava);
                   const isMandatory = metrica.obrigatoria !== false;
                   const isMenuOpen = openMenuMetricId === metrica.id;
+                  const cleanTitle = stripDuplicateUnitSuffix(metrica.titulo, metrica.unidade);
 
                   return (
                     <tr
@@ -1038,7 +1043,7 @@ export const Metrics: React.FC = () => {
                         title="Clique para editar as configurações desta métrica"
                       >
                         <div className="metrics-page__metric-head">
-                          <h3>{metrica.titulo}</h3>
+                          <h3>{cleanTitle}</h3>
                         </div>
                         <div className="metrics-page__meta-pills">
                           <span
@@ -1144,7 +1149,7 @@ export const Metrics: React.FC = () => {
                             <span>{typeStyle.label}</span>
                           </span>
                           <span className="metrics-page__type-hint">
-                            {typeStyle.unitHint}
+                            {metrica.unidade || typeStyle.unitHint}
                           </span>
                         </div>
                       </td>
@@ -1192,10 +1197,10 @@ export const Metrics: React.FC = () => {
                             </span>
                           </span>
 
-                          {studentCount > 0 && (
+                          {hasHistory && (
                             <span
                               className="metrics-page__lock-hint"
-                              title="Esta métrica já possui histórico de alunos: o tipo de grandeza é protegido e ela não pode ser apagada fisicamente."
+                              title="Esta métrica já possui histórico de alunos: o tipo e a unidade são protegidos e ela não pode ser apagada fisicamente."
                             >
                               <svg
                                 width="11"
@@ -1218,7 +1223,7 @@ export const Metrics: React.FC = () => {
                                 />
                                 <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                               </svg>
-                              Tipo protegido
+                              Tipo e unidade protegidos
                             </span>
                           )}
                         </div>

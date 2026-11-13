@@ -5,6 +5,8 @@ import Button from "../Button/Button";
 import Badge from "../Badge/Badge";
 import { displayDate } from "../../features/personal/dashboardModel";
 import { parseAtividades } from "../../utils/activityParser";
+import { formatDurationMinutes } from "../../utils/durationFormat";
+import { formatMetricDisplayValue, stripDuplicateUnitSuffix } from "../../utils/metricValueFormat";
 import type { TrainingSession } from "../../types/personalDashboard";
 import type { RotinaResponse } from "../../types/rotina";
 import "./ProfileSessions.css";
@@ -189,6 +191,7 @@ export default function ProfileSessions({
           metricaId: m.id,
           tituloMetrica: m.titulo,
           tipoMetrica: m.tipo,
+          unidade: m.unidade ?? null,
         }));
     }
     const allMetrics = [
@@ -403,9 +406,15 @@ export default function ProfileSessions({
                   <th scope="col">Sessão / Atividades</th>
                   <th scope="col">{recent ? "Data / Duração" : "Data"}</th>
                   {!recent && <th scope="col">Duração</th>}
-                  {metrics.map((m) => (
-                    <th scope="col" key={m.metricaId}>{m.tituloMetrica}</th>
-                  ))}
+                  {metrics.map((m) => {
+                    const cleanHeader = stripDuplicateUnitSuffix(m.tituloMetrica, m.unidade);
+                    return (
+                      <th scope="col" key={m.metricaId}>
+                        {cleanHeader}
+                        {m.unidade ? ` (${m.unidade})` : ""}
+                      </th>
+                    );
+                  })}
                   <th scope="col">RPE</th>
                   <th scope="col">Status</th>
                   {!recent && <th scope="col">Fonte</th>}
@@ -442,7 +451,9 @@ export default function ProfileSessions({
                       ? routineTitleById.get(s.rotinaTreinoId)
                       : null;
                   const durationPrefix =
-                    recent && s.duracao !== null ? `${s.duracao} min · ` : "";
+                    recent && s.duracao !== null
+                      ? `${formatDurationMinutes(s.duracao)} · `
+                      : "";
 
                   return (
                     <tr
@@ -486,14 +497,24 @@ export default function ProfileSessions({
                         </div>
                       </td>
                       {!recent && (
-                        <td>{s.duracao === null ? "—" : `${s.duracao} min`}</td>
+                        <td>{s.duracao === null ? "—" : formatDurationMinutes(s.duracao)}</td>
                       )}
-                      {metrics.map((m) => (
-                        <td key={m.metricaId}>
-                          {s.desempenho?.metricas.find((v) => v.metricaId === m.metricaId)
-                            ?.valor || "—"}
-                        </td>
-                      ))}
+                      {metrics.map((m) => {
+                        const entry = s.desempenho?.metricas.find(
+                          (v) => v.metricaId === m.metricaId
+                        );
+                        return (
+                          <td key={m.metricaId}>
+                            {entry?.valor
+                              ? formatMetricDisplayValue(
+                                  entry.valor,
+                                  m.tipoMetrica,
+                                  entry.unidade ?? m.unidade
+                                )
+                              : "—"}
+                          </td>
+                        );
+                      })}
                       <td>
                         <span className="profile-sessions__rpe">
                           {s.desempenho?.nivelCansaco === null ||

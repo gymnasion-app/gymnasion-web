@@ -7,7 +7,7 @@ export interface StudentSessionMetricResult {
   titulo: string;
   tipo: TipoMetrica | string;
   valor: string;
-  unidade?: string;
+  unidade?: string | null;
 }
 
 export interface StudentWorkoutSession {
@@ -24,6 +24,7 @@ export interface StudentWorkoutSession {
   duracaoPlanejada?: number;
   duracaoReal?: number | null;
   dataReal?: string | null;
+  stravaAtividadeId?: string | null;
   status: StudentSessionStatus;
   destaque?: boolean;
   rpe?: number | null;
@@ -105,6 +106,7 @@ export interface StudentEvolutionMetricSeries {
   metricaId: string;
   titulo: string;
   tipo: TipoMetrica | string;
+  unidade?: string | null;
   descontinuada: boolean;
   statusMetrica?: string;
   tendencia?: {
@@ -172,6 +174,7 @@ export interface StudentExecutionPayloadDTO {
   dataReal: string;
   duracao: number | null;
   nivelCansaco: number | null;
+  stravaAtividadeId?: string | null;
   resultados: { metricaId: string; valor: string }[];
 }
 
@@ -194,6 +197,8 @@ export interface StudentHistorySessionDTO {
     id: string;
     nivelCansaco: number | null;
     registradoPor?: string;
+    observacoes?: string | null;
+    stravaAtividadeId?: string | null;
     metricas?: {
       id?: string;
       metricaId: string;
@@ -201,6 +206,7 @@ export interface StudentHistorySessionDTO {
       tituloMetrica?: string;
       tipo?: string;
       tipoMetrica?: string;
+      unidade?: string | null;
       valor: string;
     }[];
   } | null;
@@ -208,6 +214,7 @@ export interface StudentHistorySessionDTO {
     metricaId: string;
     metricaTitulo: string;
     tipo: string;
+    unidade?: string | null;
     valor: string;
   }[];
 }

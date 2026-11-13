@@ -72,15 +72,20 @@ test("sessionDetailService maps all Figma screens to backend endpoints", async (
 
   // 4. Corrigir desempenho com justificativa obrigatória (US-23 C3, C4)
   const payloadCorrecao = {
+    duracao: 62,
     nivelCansaco: 8,
-    justificativa: "Ajuste após alinhamento presencial com a aluna",
+    observacoes: "",
+    justificativa: "Ajuste após alinhamento presencial com o aluno",
     metricas: [{ metricaId: "m-1", valor: "00:42:15" }],
   };
   await sessionDetailService.corrigirDesempenho("sess-100", payloadCorrecao);
   assert.equal(calledUrl, "/api/personal-trainers/rotinas/sessoes/sess-100/desempenho");
   assert.equal(calledMethod, "PATCH");
+  assert.equal(calledBody.duracao, 62);
+  assert.equal(calledBody.observacoes, "");
   assert.equal(calledBody.justificativa, payloadCorrecao.justificativa);
   assert.equal(calledBody.nivelCansaco, 8);
+  assert.deepEqual(calledBody.metricas, [{ metricaId: "m-1", valor: "00:42:15" }]);
 
   // 5. Consultar trilha de auditoria (US-23 C5)
   await sessionDetailService.consultarAuditoria("sess-100");
