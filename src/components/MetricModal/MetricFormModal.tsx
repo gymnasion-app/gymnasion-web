@@ -510,7 +510,8 @@ export default function MetricFormModal({
                 <path d="M7 11V7a5 5 0 0 1 10 0v4" />
               </svg>
               <span>
-                Não é possível alterar o tipo ou a unidade de uma métrica com histórico de registros. Crie uma nova métrica.
+                Não é possível alterar o tipo de uma métrica com histórico de registros. Crie uma nova métrica.
+                A unidade também fica bloqueada para manter o histórico comparável.
               </span>
             </div>
           )}

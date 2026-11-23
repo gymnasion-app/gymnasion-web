@@ -436,17 +436,6 @@
   color: #ef4444;
 }
 
-.student-rpe-modal__personal-strava-val {
-  display: inline-flex;
-  align-items: center;
-  background: #ecfdf5;
-  color: #065f46;
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-weight: 600;
-  font-size: 12px;
-}
-
 .student-rpe-modal__personal-pending {
   color: #64748b;
   font-size: 12px;

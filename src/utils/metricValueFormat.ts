@@ -149,7 +149,8 @@ export function sugerirTipoEUnidade(
   const mod = normalizeTextAscii(nomeModalidade);
   const isNatacao = mod.includes("natac") || mod.includes("swim");
   const isRemo = mod.includes("remo") || mod.includes("rowing");
-  const isCiclismo = mod.includes("ciclismo") || mod.includes("spinning") || mod.includes("bike");
+  // Mesma heurística de CampoStrava.sugerirTipoEUnidade (back) e da migração V25
+  const isCiclismo = mod.includes("ciclismo") || mod.includes("spinning");
   const isEndurance =
     isCiclismo ||
     mod.includes("triatl") ||
@@ -302,6 +303,35 @@ export function formatSecondsToTime(totalSeconds: number, forceHours = false): s
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
+const METROS_POR_UNIDADE_RITMO: Record<string, number> = {
+  "min/km": 1000,
+  "min/100m": 100,
+  "min/500m": 500,
+};
+
+/**
+ * Unidade em que o back calcula `ritmoMedio`, a partir do `sport_type` bruto do Strava
+ * (mesma regra de StravaService.calcularRitmo).
+ */
+export function paceUnitForSportType(sportType?: string | null): string {
+  const tipo = (sportType || "").toLowerCase();
+  if (tipo.includes("swim")) return "min/100m";
+  if (tipo.includes("rowing") || tipo.includes("virtualrow")) return "min/500m";
+  return "min/km";
+}
+
+/**
+ * Converte velocidade (m/s) em ritmo mm:ss na unidade pedida (padrão min/km).
+ * Retorna null quando não há velocidade ou o ritmo passa de 99:59 (limite do validador).
+ */
+export function paceFromSpeed(speedMs?: number | null, unidade?: string | null): string | null {
+  if (speedMs == null || !Number.isFinite(speedMs) || speedMs <= 0) return null;
+  const metros = METROS_POR_UNIDADE_RITMO[unidade || "min/km"] ?? 1000;
+  const totalSeconds = Math.round(metros / speedMs);
+  if (totalSeconds <= 0 || totalSeconds > 99 * 60 + 59) return null;
+  return formatSecondsToTime(totalSeconds);
+}
+
 function isPaceMetric(unidade?: string | null, campoStrava?: CampoStrava | string | null): boolean {
   return isUnidadeRitmo(unidade) || campoStrava === "RITMO_MEDIO";
 }
@@ -390,13 +420,31 @@ export function validateMetricValue(
     return undefined;
   }
 
-  const validTwo = /^[0-5]?\d:[0-5]\d$/.test(trimmed);
+  // mm:ss com 60+ minutos (ex: 75:30) é aceito: normalizeMetricInput converte para hh:mm:ss (até 99:59:59)
+  const twoParts = /^(\d{1,4}):[0-5]\d$/.exec(trimmed);
+  const validTwo = twoParts !== null && Number(twoParts[1]) <= 5999;
   const validThree = /^\d{1,2}:[0-5]\d:[0-5]\d$/.test(trimmed);
   if (!validTwo && !validThree) {
     return "Use o formato mm:ss (ex: 01:42) ou hh:mm:ss (ex: 01:15:30).";
   }
   return undefined;
 }
+
+/**
+ * Formata o valor numérico de uma série de gráfico conforme o tipo da métrica:
+ * TEMPO chega em segundos (mm:ss / hh:mm:ss), FC em bpm inteiro, demais em número pt-BR.
+ */
+export function chartValueFormatter(tipo?: string | null): (value: number) => string {
+  const normTipo = normalizeTipo(tipo);
+  if (normTipo === "TEMPO") return (v) => formatSecondsToTime(v);
+  if (normTipo === "FREQUENCIA_CARDIACA") return (v) => String(Math.round(v));
+  const nf = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 });
+  return (v) => nf.format(v);
+}
+
+/** Formatador do RPE (Borg CR-10): até 1 casa decimal. */
+export const formatRpeValue = (value: number): string =>
+  new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 }).format(value);
 
 export function formatMetricDisplayValue(
   valor?: string | null,

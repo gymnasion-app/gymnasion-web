@@ -129,6 +129,39 @@
 
 .student-evo-page__card-chart {
   margin-top: 4px;
+  min-width: 0;
+}
+
+/* Tabela de valores (alternativa acessível ao gráfico) */
+.student-evo-page__values {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.student-evo-page__values summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.student-evo-page__values table {
+  width: 100%;
+  margin-top: 8px;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.student-evo-page__values th,
+.student-evo-page__values td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+}
+
+.student-evo-page__values th {
+  color: var(--color-text-muted);
+  font-weight: 600;
 }
 
 @media (max-width: 900px) {

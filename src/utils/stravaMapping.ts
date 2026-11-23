@@ -3,6 +3,8 @@ import {
   formatSecondsToTime,
   normalizeMetricInput,
   normalizeTipo,
+  paceFromSpeed,
+  paceUnitForSportType,
   parseMetricNumericValue,
   parseTimeSegments,
 } from "./metricValueFormat";
@@ -54,6 +56,20 @@ function extractPureMmSs(ritmoMedio?: string | null): string | null {
 }
 
 /**
+ * Ritmo da atividade convertido para a unidade da métrica (min/km, min/100m ou min/500m).
+ * Sem `ritmoMedio` (ex.: pedal) não há ritmo a importar. Sem velocidade bruta (back antigo),
+ * só reaproveita `ritmoMedio` quando a unidade calculada pelo back coincide com a da métrica.
+ */
+function extractPaceForUnit(activity: StravaAtividade, unidade?: string | null): string | null {
+  if (!activity.ritmoMedio) return null;
+  const converted = paceFromSpeed(activity.velocidadeMediaMs, unidade);
+  if (converted) return converted;
+  if (activity.velocidadeMediaMs != null) return null;
+  const unidadeMetrica = unidade || "min/km";
+  return paceUnitForSportType(activity.tipo) === unidadeMetrica ? extractPureMmSs(activity.ritmoMedio) : null;
+}
+
+/**
  * Extrai estritamente o campo configurado em `metric.campoStrava` a partir da atividade do Strava.
  * Não utiliza nenhuma heurística por título ou nome de métrica.
  */
@@ -92,7 +108,7 @@ export function extractStravaFieldValue(
       raw = activity.velocidadeMaximaKmh != null ? String(activity.velocidadeMaximaKmh) : null;
       break;
     case "RITMO_MEDIO":
-      raw = extractPureMmSs(activity.ritmoMedio);
+      raw = extractPaceForUnit(activity, metric.unidade);
       break;
     case "FREQUENCIA_CARDIACA_MEDIA":
       raw =
@@ -128,6 +144,24 @@ export function extractStravaFieldValue(
   if (!raw) return null;
   const normalized = normalizeMetricInput(metric.tipo, raw, metric.unidade, campo);
   return normalized || null;
+}
+
+/** Métrica vinculada a algum campo do Strava (pode ser preenchida automaticamente). */
+export function isStravaLinked(metric: Pick<StravaMappableMetric, "campoStrava">): boolean {
+  return Boolean(metric.campoStrava && metric.campoStrava !== "NENHUM");
+}
+
+/**
+ * Atividade realizada no mesmo dia da sessão planejada (a mais recente, se houver várias).
+ * Sem correspondência, retorna null: nada é pré-selecionado e o usuário escolhe ou preenche manualmente,
+ * evitando importar dados (e a data real) de um treino de outro dia.
+ */
+export function pickActivityForDate(
+  activities: StravaAtividade[],
+  plannedIso?: string | null
+): StravaAtividade | null {
+  if (!plannedIso) return null;
+  return activities.find((a) => a.data === plannedIso) ?? null;
 }
 
 /**

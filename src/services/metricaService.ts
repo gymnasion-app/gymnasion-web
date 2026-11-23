@@ -10,9 +10,10 @@ import {
 } from '../types/metric';
 
 function sanitizeBackendTipo(tipo: string): 'FREQUENCIA_CARDIACA' | 'TEXTO' | 'TEMPO' | 'NUMERICO' {
-  if (tipo === 'TEMPO' || tipo === 'TEXTO' || tipo === 'FREQUENCIA_CARDIACA' || tipo === 'NUMERICO') {
-    return tipo;
-  }
+  // Aceita também os nomes legados dos tipos (B7)
+  if (tipo === 'TEMPO' || tipo === 'TEMPO_CRONOMETRO') return 'TEMPO';
+  if (tipo === 'TEXTO' || tipo === 'TEXTO_OBSERVACAO') return 'TEXTO';
+  if (tipo === 'FREQUENCIA_CARDIACA') return 'FREQUENCIA_CARDIACA';
   return 'NUMERICO';
 }
 

@@ -21,6 +21,7 @@ import {
   activityNeedsCaloriesDetail,
   applyStravaSelection,
   extractStravaFieldValue,
+  pickActivityForDate,
   resolveStravaAtividadeIdToSubmit,
   valuesMatchForStrava,
   type StravaMappableMetric,
@@ -122,6 +123,10 @@ export default function SessionRegisterDialog({
   const detailRequestedIdsRef = useRef<Set<string>>(new Set());
 
   const selected = candidates.find((s) => s.sessaoId === sessionId);
+  const plannedIsoRef = useRef<string | null>(null);
+  plannedIsoRef.current = selected?.dataPlanejada ?? null;
+  // Escolha manual de atividade pelo personal: preservada ao trocar de sessão
+  const manualStravaChoiceRef = useRef(false);
   const selectedParsed = selected ? parseAtividades(selected.atividades) : null;
   const sessionMetrics = useMemo(() => selected?.metricas || [], [selected]);
   const allowed = useMemo(
@@ -190,7 +195,11 @@ export default function SessionRegisterDialog({
     });
   }
 
-  function resetAndMaybeApplyStrava(nextSessionMetrics: typeof sessionMetrics, keepManualChoice = false) {
+  function resetAndMaybeApplyStrava(
+    nextSessionMetrics: typeof sessionMetrics,
+    keepManualChoice = false,
+    plannedIso: string | null = null
+  ) {
     const nextAllowed: StravaMappableMetric[] = nextSessionMetrics
       .filter((m) => m.quemPreenche !== "ALUNO")
       .map((m) => ({
@@ -211,9 +220,10 @@ export default function SessionRegisterDialog({
     setStravaDetailWarning("");
     setSelectedStravaId(null);
 
+    // Sem escolha manual, só pré-seleciona a atividade do mesmo dia da sessão planejada
     const activityToApply = keepManualChoice
       ? stravaActivities.find((a) => a.id === selectedStravaId) ?? null
-      : stravaActivities[0] ?? null;
+      : pickActivityForDate(stravaActivities, plannedIso);
 
     if (activityToApply) {
       applyStravaForSession(activityToApply, nextAllowed, true);
@@ -226,13 +236,14 @@ export default function SessionRegisterDialog({
     const nextCandidates = sessionCandidates(nextEntry?.tracking ?? null, student.id);
     const nextSess = nextCandidates[0];
     setSessionId(nextSess?.sessaoId || "");
-    resetAndMaybeApplyStrava(nextSess?.metricas || [], false);
+    manualStravaChoiceRef.current = false;
+    resetAndMaybeApplyStrava(nextSess?.metricas || [], false, nextSess?.dataPlanejada ?? null);
   }
 
   function handleSessionChange(nextSessionId: string) {
     setSessionId(nextSessionId);
     const nextSess = candidates.find((s) => s.sessaoId === nextSessionId);
-    resetAndMaybeApplyStrava(nextSess?.metricas || [], true);
+    resetAndMaybeApplyStrava(nextSess?.metricas || [], manualStravaChoiceRef.current, nextSess?.dataPlanejada ?? null);
   }
 
   useEffect(() => {
@@ -250,8 +261,9 @@ export default function SessionRegisterDialog({
           const acts = await stravaService.listarAtividadesAluno(student.id, 10);
           if (!active) return;
           setStravaActivities(acts);
-          if (acts.length > 0) {
-            applyStravaForSession(acts[0], mappableAllowed, false);
+          const doDia = pickActivityForDate(acts, plannedIsoRef.current);
+          if (doDia) {
+            applyStravaForSession(doDia, mappableAllowed, false);
           }
         } else {
           setStravaActivities([]);
@@ -341,6 +353,7 @@ export default function SessionRegisterDialog({
   }, [student.id, selectedActivity, mappableAllowed]);
 
   function handleSelectStrava(actId: string) {
+    manualStravaChoiceRef.current = true;
     if (!actId) {
       applyStravaForSession(null, mappableAllowed, false);
       return;
@@ -514,6 +527,12 @@ export default function SessionRegisterDialog({
               ))}
               <option value="">Não importar do Strava (preencher manualmente)</option>
             </select>
+            {!selectedStravaId && selected?.dataPlanejada && !pickActivityForDate(stravaActivities, selected.dataPlanejada) && (
+              <p className="session-register__strava-muted" role="status">
+                Nenhuma atividade do Strava em {selected.dataPlanejada.split("-").reverse().join("/")}, data planejada
+                da sessão. Selecione a atividade correspondente ou preencha manualmente.
+              </p>
+            )}
             {loadingCaloriesDetail && (
               <p className="session-register__strava-muted">
                 Buscando calorias detalhadas no Strava...
