@@ -7,20 +7,15 @@
 .student-evolution__range > span:not(.unavailable-action) { background: white; border: 1px solid var(--color-border); border-radius: 10px; padding: 12px; }
 .student-evolution__range input { max-width: 160px; border: 1px solid var(--color-border); padding: 10px; border-radius: 8px; background: white; color: var(--color-ink-700); }
 .student-evolution__grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; }
-.evolution-card { --chart-color: var(--color-info); }
-.evolution-card--orange { --chart-color: var(--color-primary-500); }
-.evolution-card--red { --chart-color: var(--color-danger); }
-.evolution-card--purple { --chart-color: var(--color-sport-academia); }
 .evolution-card header { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
 .evolution-card header p, .evolution-card__empty { font-size: 13px; color: var(--color-ink-500); }
 .evolution-card__change { white-space: nowrap; border-radius: 999px; padding: 4px 8px; color: var(--color-ink-500); background: var(--color-background); font-size: 12px; }
 .evolution-card__value { display: block; margin: 12px 0; font-size: 28px; letter-spacing: -.02em; }
 .evolution-card__value small { font-size: 13px; font-weight: 400; color: var(--color-ink-500); letter-spacing: normal; }
-.evolution-card svg { width: 100%; display: block; overflow: visible; }
-.evolution-card svg text { fill: var(--color-ink-400); font-size: 12px; }
 .evolution-card__empty { display: grid; place-items: center; min-height: 150px; text-align: center; }
 .evolution-card details { font-size: 12px; color: var(--color-ink-500); margin-top: 10px; }
 .evolution-card summary { cursor: pointer; }
 .evolution-card table { width: 100%; margin-top: 8px; text-align: left; }
-.evolution-card--compact svg { margin-top: 16px; }
+
 @media (max-width: 640px) { .student-evolution__grid { grid-template-columns: 1fr; } }
+.evolution-card--compact .line-chart { margin-top: 12px; }

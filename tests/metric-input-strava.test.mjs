@@ -386,3 +386,12 @@ test("Aviso 'não detectada no Strava' só vale para métricas vinculadas ao Str
   assert.equal(stravaMapping.isStravaLinked({ campoStrava: null }), false);
   assert.equal(stravaMapping.isStravaLinked({}), false);
 });
+
+test("Eixo Y dos gráficos usa ticks redondos que cobrem os dados", () => {
+  const { niceTicks } = load("utils/chartTicks.ts");
+  assert.deepEqual(Array.from(niceTicks(4.1, 7.35, 5)), [4, 5, 6, 7, 8]);
+  assert.deepEqual(Array.from(niceTicks(256, 432, 5)), [250, 300, 350, 400, 450]);
+  assert.deepEqual(Array.from(niceTicks(0, 10, 6)), [0, 2, 4, 6, 8, 10]);
+  const iguais = niceTicks(150, 150, 5);
+  assert.ok(iguais[0] < 150 && iguais.at(-1) > 150);
+});

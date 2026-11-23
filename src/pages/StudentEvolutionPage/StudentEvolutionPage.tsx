@@ -1,12 +1,17 @@
 import { useEffect, useState } from "react";
 import Badge from "../../components/Badge/Badge";
-import StudentSmoothChart from "../../components/StudentSmoothChart/StudentSmoothChart";
+import LineChart from "../../components/LineChart/LineChart";
 import ReportDialog from "../../components/ReportDialog/ReportDialog";
 import { useStudentArea } from "../../features/studentArea/StudentContext";
 import { reportPeriodFromDays } from "../../features/report/reportModel";
 import { alunoService } from "../../services/alunoService";
 import { relatorioService } from "../../services/relatorioService";
-import { formatMetricDisplayValue, stripDuplicateUnitSuffix } from "../../utils/metricValueFormat";
+import {
+  chartValueFormatter,
+  formatMetricDisplayValue,
+  formatRpeValue,
+  stripDuplicateUnitSuffix,
+} from "../../utils/metricValueFormat";
 import type { EvolutionPeriodKey, StudentEvolutionResponseDTO } from "../../types/studentArea";
 import "./StudentEvolutionPage.css";
 
@@ -155,11 +160,14 @@ export default function StudentEvolutionPage() {
                 </div>
 
                 <div className="student-evo-page__card-chart">
-                  <StudentSmoothChart
-                    values={evoData.evolucaoRpe.pontos.map((p) => p.nivelCansaco)}
-                    labels={evoData.evolucaoRpe.pontos.map((p) => p.data?.slice(5) || "")}
+                  <LineChart
+                    points={evoData.evolucaoRpe.pontos.map((p) => ({ date: p.data, value: p.nivelCansaco }))}
+                    formatValue={formatRpeValue}
+                    seriesLabel="RPE da sessão"
+                    unitLabel="RPE"
+                    yDomain={[0, 10]}
                     color="orange"
-                    ariaLabel="Gráfico de esforço percebido ao longo do período"
+                    ariaLabel="Gráfico de esforço percebido (RPE, 0 a 10) ao longo do período"
                   />
                 </div>
               </section>
@@ -173,6 +181,7 @@ export default function StudentEvolutionPage() {
               if (numericPoints.length === 0) return null;
               const lastPoint = numericPoints[numericPoints.length - 1];
               const cleanTitle = stripDuplicateUnitSuffix(m.titulo, m.unidade);
+              const unitText = m.unidade || (m.tipo === "FREQUENCIA_CARDIACA" ? "bpm" : m.tipo === "TEMPO" ? "mm:ss" : "");
               const visual = m.tendencia?.indicadorVisual;
               const badgeTone =
                 visual === "MELHORIA"
@@ -211,17 +220,39 @@ export default function StudentEvolutionPage() {
 
                   <div className="student-evo-page__card-value">
                     <strong>{formatMetricDisplayValue(lastPoint.valor, m.tipo, m.unidade)}</strong>
-                    <span>{m.unidade || (m.tipo === "FREQUENCIA_CARDIACA" ? "bpm" : m.tipo === "TEMPO" ? "mm:ss" : "")}</span>
+                    <span>{unitText}</span>
                   </div>
 
                   <div className="student-evo-page__card-chart">
-                    <StudentSmoothChart
-                      values={numericPoints.map((p) => p.valorNumerico)}
-                      labels={numericPoints.map((p) => p.data?.slice(5) || "")}
+                    <LineChart
+                      points={numericPoints.map((p) => ({ date: p.data, value: p.valorNumerico }))}
+                      formatValue={chartValueFormatter(m.tipo)}
+                      seriesLabel={unitText ? `${cleanTitle} (${unitText})` : cleanTitle}
+                      unitLabel={unitText || undefined}
                       color="blue"
                       ariaLabel={`Gráfico de evolução da métrica ${cleanTitle}`}
                     />
                   </div>
+
+                  <details className="student-evo-page__values">
+                    <summary>Ver valores</summary>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th scope="col">Data</th>
+                          <th scope="col">Valor</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {numericPoints.map((p) => (
+                          <tr key={p.sessaoId}>
+                            <td>{p.data ? p.data.split("-").reverse().join("/") : "—"}</td>
+                            <td>{formatMetricDisplayValue(p.valor, m.tipo, m.unidade)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </details>
                 </section>
               );
             })}

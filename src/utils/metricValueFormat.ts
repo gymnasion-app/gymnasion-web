@@ -430,6 +430,22 @@ export function validateMetricValue(
   return undefined;
 }
 
+/**
+ * Formata o valor numérico de uma série de gráfico conforme o tipo da métrica:
+ * TEMPO chega em segundos (mm:ss / hh:mm:ss), FC em bpm inteiro, demais em número pt-BR.
+ */
+export function chartValueFormatter(tipo?: string | null): (value: number) => string {
+  const normTipo = normalizeTipo(tipo);
+  if (normTipo === "TEMPO") return (v) => formatSecondsToTime(v);
+  if (normTipo === "FREQUENCIA_CARDIACA") return (v) => String(Math.round(v));
+  const nf = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 });
+  return (v) => nf.format(v);
+}
+
+/** Formatador do RPE (Borg CR-10): até 1 casa decimal. */
+export const formatRpeValue = (value: number): string =>
+  new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 }).format(value);
+
 export function formatMetricDisplayValue(
   valor?: string | null,
   tipo?: string | null,
