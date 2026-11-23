@@ -313,3 +313,76 @@ test("stravaService uses default limit 10 and hits detail endpoints for aluno an
   await stravaService.obterDetalheAtividadeAluno("aluno 1", "98765");
   assert.equal(calls[3].url, "/api/personal-trainers/alunos/aluno%201/strava/atividades/98765");
 });
+
+test("M1: ritmo do Strava é convertido para a unidade da métrica a partir da velocidade bruta", () => {
+  const metric = (unidade) => ({ id: "m", tipo: "TEMPO", unidade, quemPreenche: "AMBOS", campoStrava: "RITMO_MEDIO" });
+  const swim = { id: "s", tipo: "Swim", ritmoMedio: "02:00", velocidadeMediaMs: 100 / 120 };
+  const run = { id: "r", tipo: "Run", ritmoMedio: "05:00", velocidadeMediaMs: 1000 / 300 };
+  const row = { id: "w", tipo: "Rowing", ritmoMedio: "02:06", velocidadeMediaMs: 500 / 126 };
+
+  // Natação importada em métrica min/km: 2:00/100m equivale a 20:00/km
+  assert.equal(stravaMapping.extractStravaFieldValue(swim, metric("min/km")), "20:00");
+  assert.equal(stravaMapping.extractStravaFieldValue(swim, metric("min/100m")), "02:00");
+  // Corrida em métrica min/100m: 5:00/km equivale a 0:30/100m
+  assert.equal(stravaMapping.extractStravaFieldValue(run, metric("min/100m")), "00:30");
+  // Remo em min/500m e em min/km
+  assert.equal(stravaMapping.extractStravaFieldValue(row, metric("min/500m")), "02:06");
+  assert.equal(stravaMapping.extractStravaFieldValue(row, metric("min/km")), "04:12");
+});
+
+test("M1: sem ritmo (pedal) ou sem velocidade em unidade divergente, o ritmo não é preenchido", () => {
+  const metric = (unidade) => ({ id: "m", tipo: "TEMPO", unidade, quemPreenche: "AMBOS", campoStrava: "RITMO_MEDIO" });
+  const ride = { id: "b", tipo: "Ride", ritmoMedio: null, velocidadeMediaMs: 8 };
+  assert.equal(stravaMapping.extractStravaFieldValue(ride, metric("min/km")), null);
+
+  // Back antigo (sem velocidadeMediaMs): só reaproveita quando a unidade coincide com a do esporte
+  const swimLegacy = { id: "s", tipo: "Swim", ritmoMedio: "02:00" };
+  assert.equal(stravaMapping.extractStravaFieldValue(swimLegacy, metric("min/100m")), "02:00");
+  assert.equal(stravaMapping.extractStravaFieldValue(swimLegacy, metric("min/km")), null);
+
+  // Ritmo acima de 99:59 na unidade pedida não é importado (validador rejeitaria)
+  const walkSlow = { id: "c", tipo: "Walk", ritmoMedio: "50:00", velocidadeMediaMs: 0.1 };
+  assert.equal(stravaMapping.extractStravaFieldValue(walkSlow, metric("min/km")), null);
+});
+
+test("B4: unidade exibida do ritmo segue o sport_type bruto, não o nome traduzido", () => {
+  assert.equal(metricValueFormat.paceUnitForSportType("Swim"), "min/100m");
+  assert.equal(metricValueFormat.paceUnitForSportType("Rowing"), "min/500m");
+  assert.equal(metricValueFormat.paceUnitForSportType("VirtualRow"), "min/500m");
+  assert.equal(metricValueFormat.paceUnitForSportType("Run"), "min/km");
+  assert.equal(metricValueFormat.paceUnitForSportType(null), "min/km");
+});
+
+test("B6: cronômetro mm:ss com 60+ minutos é aceito e normalizado para hh:mm:ss", () => {
+  assert.equal(metricValueFormat.validateMetricValue("TEMPO", "75:30", "mm:ss"), undefined);
+  assert.equal(metricValueFormat.normalizeMetricInput("TEMPO", "75:30", "mm:ss"), "01:15:30");
+  assert.equal(metricValueFormat.validateMetricValue("TEMPO", "5999:59", "hh:mm:ss"), undefined);
+  assert.notEqual(metricValueFormat.validateMetricValue("TEMPO", "6000:00", "mm:ss"), undefined);
+  // Ritmo continua limitado a mm:ss com até 99 minutos
+  assert.notEqual(metricValueFormat.validateMetricValue("TEMPO", "100:00", "min/km"), undefined);
+});
+
+test("B8: sugestão de unidade segue a mesma heurística do back (sem 'bike')", () => {
+  assert.equal(metricValueFormat.sugerirTipoEUnidade("CADENCIA_MEDIA", "Ciclismo").unidade, "rpm");
+  assert.equal(metricValueFormat.sugerirTipoEUnidade("CADENCIA_MEDIA", "Mountain Bike").unidade, "spm");
+});
+
+test("Pré-seleção: só a atividade do mesmo dia da sessão é escolhida automaticamente", () => {
+  const acts = [
+    { id: "a1", data: "2026-11-23" },
+    { id: "a2", data: "2026-11-22" },
+    { id: "a3", data: "2026-11-22" },
+  ];
+  assert.equal(stravaMapping.pickActivityForDate(acts, "2026-11-22").id, "a2"); // a mais recente do dia
+  assert.equal(stravaMapping.pickActivityForDate(acts, "2026-11-23").id, "a1");
+  assert.equal(stravaMapping.pickActivityForDate(acts, "2026-11-20"), null); // nenhum treino no dia
+  assert.equal(stravaMapping.pickActivityForDate(acts, null), null);
+  assert.equal(stravaMapping.pickActivityForDate([], "2026-11-23"), null);
+});
+
+test("Aviso 'não detectada no Strava' só vale para métricas vinculadas ao Strava", () => {
+  assert.equal(stravaMapping.isStravaLinked({ campoStrava: "POTENCIA_MEDIA_WATTS" }), true);
+  assert.equal(stravaMapping.isStravaLinked({ campoStrava: "NENHUM" }), false);
+  assert.equal(stravaMapping.isStravaLinked({ campoStrava: null }), false);
+  assert.equal(stravaMapping.isStravaLinked({}), false);
+});

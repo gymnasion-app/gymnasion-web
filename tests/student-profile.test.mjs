@@ -27,7 +27,9 @@ test('metric input validation and serialization match backend constraints',()=>{
   assert.ok(model.metricError('TEMPO','01:99'));
   assert.equal(model.metricError('TEMPO','1:42'),undefined);
   assert.equal(model.metricError('TEMPO','01:15:30'),undefined);
-  assert.ok(model.metricError('TEMPO','75:30'));
+  // B6: cronômetro com 60+ minutos é aceito e serializado em hh:mm:ss
+  assert.equal(model.metricError('TEMPO','75:30'),undefined);
+  assert.equal(model.serializeMetric({tipo:'TEMPO'},'75:30'),'01:15:30');
   assert.equal(model.metricError('TEMPO','75:30','min/km'),undefined);
   assert.equal(model.serializeMetric({tipo:'TEMPO'},'1:42'),'01:42');
   assert.equal(model.serializeMetric({tipo:'TEMPO'},'1:15:30'),'01:15:30');

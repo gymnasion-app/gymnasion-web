@@ -59,6 +59,8 @@ export interface StravaAtividade {
   velocidadeMediaKmh?: number | null;
   velocidadeMaximaKmh?: number | null;
   calorias?: number | null;
+  /** Velocidade média bruta (m/s), usada para converter o ritmo à unidade da métrica. */
+  velocidadeMediaMs?: number | null;
 }
 
 export type CampoStravaGrupo =

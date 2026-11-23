@@ -12,7 +12,6 @@ import { stravaService } from "../../services/stravaService";
 import { connectStravaWithPopup, STRAVA_STATUS_CHANGED } from "../../features/strava/connectWithPopup";
 import { authError } from "../../utils/authError";
 import {
-  formatMetricDisplayValue,
   normalizeMetricInput,
   normalizeTipo,
   validateMetricValue,
@@ -21,6 +20,8 @@ import {
   activityNeedsCaloriesDetail,
   applyStravaSelection,
   extractStravaFieldValue,
+  isStravaLinked,
+  pickActivityForDate,
   resolveStravaAtividadeIdToSubmit,
   valuesMatchForStrava,
   type StravaMetaBaseline,
@@ -123,6 +124,9 @@ export default function StudentRpeModal({
   dateRealRef.current = dateReal;
   const durationRef = useRef<string>(duration);
   durationRef.current = duration;
+  const plannedIso = targetSession?.dataPlanejadaIso ?? null;
+  const plannedIsoRef = useRef<string | null>(plannedIso);
+  plannedIsoRef.current = plannedIso;
 
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -233,7 +237,7 @@ export default function StudentRpeModal({
     });
   }
 
-  // Carrega status e atividades do Strava (limite=10, pré-seleciona acts[0])
+  // Carrega status e atividades do Strava (limite=10); pré-seleciona só a atividade do dia da sessão
   useEffect(() => {
     let active = true;
     async function initStrava(selectFirstActivity: boolean) {
@@ -247,8 +251,9 @@ export default function StudentRpeModal({
           const acts = await stravaService.listarAtividades(10);
           if (!active) return;
           setStravaActivities(acts);
-          if (selectFirstActivity && acts.length > 0) {
-            applyActivitySelection(acts[0]);
+          const doDia = selectFirstActivity ? pickActivityForDate(acts, plannedIsoRef.current) : null;
+          if (doDia) {
+            applyActivitySelection(doDia);
           }
         } else {
           setStravaActivities([]);
@@ -421,12 +426,8 @@ export default function StudentRpeModal({
     if (!validateForm()) return;
 
     const duracaoNum = duration.trim() ? Number(duration.trim()) : null;
-    const filledMetrics = studentMetrics.filter((m) => (values[m.id] || "").trim().length > 0);
-    const filledPersonalStravaMetrics = personalOnlyMetrics.filter(
-      (m) => (values[m.id] || "").trim().length > 0
-    );
-
-    const allMetricsToSave = [...filledMetrics, ...filledPersonalStravaMetrics];
+    // US-18 C5: métricas exclusivas do personal nunca entram no payload do aluno
+    const allMetricsToSave = studentMetrics.filter((m) => (values[m.id] || "").trim().length > 0);
 
     const payloadResultados = allMetricsToSave.map((m) => ({
       metricaId: m.id,
@@ -599,6 +600,12 @@ export default function StudentRpeModal({
                   ))}
                   <option value="">Não importar do Strava (preencher manualmente)</option>
                 </select>
+                {!selectedStravaId && plannedIso && !pickActivityForDate(stravaActivities, plannedIso) && (
+                  <p className="student-rpe-modal__strava-muted" role="status">
+                    Nenhuma atividade do Strava em {plannedIso.split("-").reverse().join("/")}, data planejada
+                    da sessão. Selecione a atividade correspondente ou preencha manualmente.
+                  </p>
+                )}
                 {loadingCaloriesDetail && (
                   <p className="student-rpe-modal__strava-muted">
                     Buscando calorias detalhadas no Strava...
@@ -747,7 +754,7 @@ export default function StudentRpeModal({
                       </div>
                     </div>
 
-                    {metric.obrigatoria && !values[metric.id] && selectedStravaId && (
+                    {metric.obrigatoria && !values[metric.id] && selectedStravaId && isStravaLinked(metric) && (
                       <span className="student-rpe-modal__strava-missing-hint">
                         Não detectada no Strava nesta atividade — informe manualmente.
                       </span>
@@ -778,33 +785,18 @@ export default function StudentRpeModal({
             <div className="student-rpe-modal__personal-metrics-note">
               <strong>Métricas avaliadas pelo Personal Trainer:</strong>
               <div className="student-rpe-modal__personal-metrics-list">
-                {personalOnlyMetrics.map((m) => {
-                  const stravaVal = values[m.id];
-                  const personalErr = errors[m.id];
-                  return (
-                    <div key={m.id} className="student-rpe-modal__personal-metric-wrapper">
-                      <div className="student-rpe-modal__personal-metric-row">
-                        <span>
-                          {m.titulo} {m.obrigatoria ? <span className="is-required">*</span> : ""}
-                        </span>
-                        {stravaVal ? (
-                          <span className="student-rpe-modal__personal-strava-val">
-                            Strava: {formatMetricDisplayValue(stravaVal, m.tipo, m.unidade)} (Automático)
-                          </span>
-                        ) : (
-                          <span className="student-rpe-modal__personal-pending">
-                            Pendente para o personal
-                          </span>
-                        )}
-                      </div>
-                      {personalErr && (
-                        <span className="student-rpe-modal__field-error" role="alert">
-                          {personalErr}
-                        </span>
-                      )}
+                {personalOnlyMetrics.map((m) => (
+                  <div key={m.id} className="student-rpe-modal__personal-metric-wrapper">
+                    <div className="student-rpe-modal__personal-metric-row">
+                      <span>
+                        {m.titulo} {m.obrigatoria ? <span className="is-required">*</span> : ""}
+                      </span>
+                      <span className="student-rpe-modal__personal-pending">
+                        Pendente para o personal
+                      </span>
                     </div>
-                  );
-                })}
+                  </div>
+                ))}
               </div>
             </div>
           )}

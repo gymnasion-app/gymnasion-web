@@ -33,3 +33,16 @@ test("all metrics requests include the backend required modalityId", async()=>{
   assert.deepEqual(calls.map(params=>params.modalidadeId),[1,2]);
   assert.equal(result.length,2);
 });
+test("B7: criarMetrica converte tipos legados antes de enviar ao back", async()=>{
+  const bodies=[];
+  const service=load("services/metricaService.ts",{
+    "./api":{api:{post:async(url,body)=>{bodies.push(body);return {data:body};}}},
+    "./modalidadeService":{modalidadeService:{listarTodas:async()=>[]}},
+    "../types/api":{unpackPage:data=>data},
+  }).metricaService;
+  await service.criarMetrica({modalidadeId:1,titulo:"Tempo",tipo:"TEMPO_CRONOMETRO",obrigatoria:false,quemPreenche:"ALUNO",unidade:"mm:ss"});
+  await service.criarMetrica({modalidadeId:1,titulo:"Obs",tipo:"TEXTO_OBSERVACAO",obrigatoria:false,quemPreenche:"ALUNO",unidade:""});
+  assert.equal(bodies[0].tipo,"TEMPO");
+  assert.equal(bodies[1].tipo,"TEXTO");
+  assert.equal(bodies[1].unidade,null);
+});
