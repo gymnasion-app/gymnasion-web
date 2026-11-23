@@ -24,7 +24,7 @@ export default function MetricDeleteModal({
   if (!isOpen) return null;
 
   const studentCount = getMetricStudentCount(metric);
-  const hasHistory = studentCount > 0;
+  const hasHistory = metric.possuiHistorico ?? (studentCount > 0);
 
   async function handleConfirm() {
     setSubmitting(true);

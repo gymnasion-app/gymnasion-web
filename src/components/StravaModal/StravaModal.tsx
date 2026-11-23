@@ -6,6 +6,7 @@ import Button from "../Button/Button";
 import { stravaService } from "../../services/stravaService";
 import { connectStravaWithPopup, STRAVA_STATUS_CHANGED } from "../../features/strava/connectWithPopup";
 import { authError } from "../../utils/authError";
+import { paceUnitForSportType } from "../../utils/metricValueFormat";
 import type { StravaAtividade, StravaStatusResponse } from "../../types/strava";
 import "./StravaModal.css";
 
@@ -212,7 +213,9 @@ export default function StravaModal({ onClose, onStatusChanged }: StravaModalPro
                           )}
                           {act.ritmoMedio && (
                             <span className="strava-modal__stat-pill">
-                              {act.ritmoMedio}
+                              {/[a-zA-Z]/.test(act.ritmoMedio)
+                                ? act.ritmoMedio
+                                : `${act.ritmoMedio} ${paceUnitForSportType(act.tipo)}`}
                             </span>
                           )}
                         </div>

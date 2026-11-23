@@ -1,6 +1,7 @@
 // src/pages/StudentSessionDetail/StudentSessionDetail.tsx
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import axios from "axios";
 import toast from "react-hot-toast";
 import {
   Calendar,
@@ -22,6 +23,7 @@ import Button from "../../components/Button/Button";
 import Badge from "../../components/Badge/Badge";
 import SportTag from "../../components/SportTag/SportTag";
 import Avatar from "../../components/Avatar/Avatar";
+import MetricValueInput from "../../components/MetricValueInput/MetricValueInput";
 import ValidateSessionModal from "../../components/ValidateSessionModal/ValidateSessionModal";
 import SessionAuditModal from "../../components/SessionAuditModal/SessionAuditModal";
 import SessionCorrectionModal from "../../components/SessionCorrectionModal/SessionCorrectionModal";
@@ -31,6 +33,13 @@ import { metricLabels } from "../../features/routines/routineModel";
 import { getPreenchimentoLabel } from "../../features/metrics/metricModel";
 import { authError } from "../../utils/authError";
 import { parseAtividades } from "../../utils/activityParser";
+import { formatDurationMinutes } from "../../utils/durationFormat";
+import {
+  formatMetricDisplayValue,
+  normalizeMetricInput,
+  stripDuplicateUnitSuffix,
+  validateMetricValue,
+} from "../../utils/metricValueFormat";
 import type {
   DesempenhoDetalheResponse,
   ObservacaoFeedbackResponse,
@@ -54,6 +63,7 @@ export default function StudentSessionDetail() {
 
   // Métricas pendentes inline
   const [pendingMetricValues, setPendingMetricValues] = useState<Record<string, string>>({});
+  const [pendingMetricErrors, setPendingMetricErrors] = useState<Record<string, string>>({});
   const [savingPendingMetric, setSavingPendingMetric] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -81,6 +91,8 @@ export default function StudentSessionDetail() {
           metricaId: m.id,
           titulo: m.titulo,
           tipo: m.tipo,
+          unidade: m.unidade ?? null,
+          campoStrava: m.campoStrava ?? null,
           obrigatoria: m.obrigatoria !== false,
           quemPreenche: m.quemPreenche || "ALUNO",
           ativa: true,
@@ -153,12 +165,25 @@ export default function StudentSessionDetail() {
   );
 
   const handleSavePendingMetric = async () => {
-    const filledPayload = pendingPersonalMetrics
-      .map((m) => ({
+    const nextErrors: Record<string, string> = {};
+    const filledPayload: Array<{ metricaId: string; valor: string }> = [];
+
+    for (const m of pendingPersonalMetrics) {
+      const rawVal = (pendingMetricValues[m.metricaId] || "").trim();
+      if (!rawVal) continue;
+      const errMsg = validateMetricValue(m.tipo, rawVal, m.unidade, m.campoStrava);
+      if (errMsg) {
+        nextErrors[m.metricaId] = errMsg;
+        continue;
+      }
+      filledPayload.push({
         metricaId: m.metricaId,
-        valor: (pendingMetricValues[m.metricaId] || "").trim(),
-      }))
-      .filter((item) => item.valor.length > 0);
+        valor: normalizeMetricInput(m.tipo, rawVal, m.unidade, m.campoStrava),
+      });
+    }
+
+    setPendingMetricErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
 
     if (filledPayload.length === 0) {
       toast.error("Por favor, preencha ao menos uma métrica pendente antes de salvar.");
@@ -172,8 +197,12 @@ export default function StudentSessionDetail() {
       });
       toast.success("Métrica(s) preenchida(s) e salva(s) com sucesso!");
       setPendingMetricValues({});
+      setPendingMetricErrors({});
       void loadData();
     } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.data?.invalidFields) {
+        setPendingMetricErrors(err.response.data.invalidFields as Record<string, string>);
+      }
       toast.error(authError(err, "Erro ao salvar a métrica pendente.").message);
     } finally {
       setSavingPendingMetric(false);
@@ -295,6 +324,7 @@ export default function StudentSessionDetail() {
             <span className="session-detail__dates-label">
               Planejada {formatDate(session.dataPlanejada)}
               {session.dataReal ? ` · Executada ${formatDate(session.dataReal)}` : ""}
+              {session.duracao ? ` · Duração: ${formatDurationMinutes(session.duracao)}` : ""}
             </span>
           </div>
         </div>
@@ -347,11 +377,15 @@ export default function StudentSessionDetail() {
               <div>
                 <h2>Resultados registrados</h2>
                 <p>
-                  Registrado por {session.nomeAluno} (aluna) ·{" "}
+                  Registrado por {session.nomeAluno} ·{" "}
                   {formatDateTime(session.dataRegistro)}
                 </p>
               </div>
-              <Badge tone="neutral">● Registro manual</Badge>
+              {session.stravaAtividadeId ? (
+                <Badge tone="warning">● Importada do Strava</Badge>
+              ) : (
+                <Badge tone="neutral">● Registro manual</Badge>
+              )}
             </header>
 
             <div className="session-detail__metrics-list">
@@ -363,14 +397,18 @@ export default function StudentSessionDetail() {
               {session.metricas.map((m) => {
                 const isPersonalPending =
                   m.inclusaoPermitida && !m.valor && (m.quemPreenche === "PERSONAL" || m.obrigatoria);
+                const cleanTitle = stripDuplicateUnitSuffix(m.titulo, m.unidade);
                 return (
                   <div key={m.metricaId} className="session-detail__metric-row">
                     <div className="session-detail__metric-info">
                       {renderMetricIcon(m.tipo)}
                       <div>
-                        <strong className="metric-title">{m.titulo}</strong>
+                        <strong className="metric-title">
+                          {cleanTitle}
+                          {m.unidade ? ` (${m.unidade})` : ""}
+                        </strong>
                         <span className="metric-subtitle">
-                          {metricLabels[m.tipo] || m.tipo} ·{" "}
+                          {m.unidade || metricLabels[m.tipo] || m.tipo} ·{" "}
                           {m.obrigatoria ? "Obrigatória" : "Opcional"} · preenche:{" "}
                           {getPreenchimentoLabel(m.quemPreenche)}
                         </span>
@@ -380,12 +418,14 @@ export default function StudentSessionDetail() {
                     <div className="session-detail__metric-val">
                       {m.valor ? (
                         <>
-                          <strong className="val-text">{m.valor}</strong>
+                          <strong className="val-text">
+                            {formatMetricDisplayValue(m.valor, m.tipo, m.unidade)}
+                          </strong>
                           <span className="val-author">
                             {m.quemPreenche === "PERSONAL"
                               ? "por Personal"
                               : m.quemPreenche === "ALUNO"
-                              ? "por Aluno(a)"
+                              ? "por Aluno"
                               : "Aluno / Personal"}
                           </span>
                         </>
@@ -420,7 +460,7 @@ export default function StudentSessionDetail() {
                         ? " · Moderado"
                         : " · Leve"}
                     </strong>
-                    <span className="val-author">por Aluno(a)</span>
+                    <span className="val-author">por Aluno</span>
                   </div>
                 </div>
               )}
@@ -450,59 +490,39 @@ export default function StudentSessionDetail() {
 
               {pendingPersonalMetrics.map((pm) => {
                 const inputId = `pending-input-${pm.metricaId}`;
-                const placeholder =
-                  pm.tipo === "TEMPO"
-                    ? "Ex.: 01:42 (mm:ss ou hh:mm:ss)"
-                    : pm.tipo === "FREQUENCIA_CARDIACA"
-                    ? "Ex.: 152 (entre 30 e 250 bpm)"
-                    : pm.tipo === "NUMERICO"
-                    ? "Ex.: 60 ou 12.5"
-                    : "Descreva a avaliação técnica da execução...";
+                const cleanTitle = stripDuplicateUnitSuffix(pm.titulo, pm.unidade);
 
                 return (
                   <div key={pm.metricaId} className="session-detail__pending-form">
                     <label htmlFor={inputId}>
-                      {pm.titulo}
+                      {cleanTitle}
+                      {pm.unidade ? ` (${pm.unidade})` : ""}
                       {pm.obrigatoria ? " *" : " (Opcional)"}
                     </label>
-                    {pm.tipo === "TEXTO" ? (
-                      <textarea
-                        id={inputId}
-                        rows={2}
-                        placeholder={placeholder}
-                        value={pendingMetricValues[pm.metricaId] || ""}
-                        onChange={(e) =>
-                          setPendingMetricValues((prev) => ({
-                            ...prev,
-                            [pm.metricaId]: e.target.value,
-                          }))
-                        }
-                      />
-                    ) : (
-                      <input
-                        id={inputId}
-                        type="text"
-                        placeholder={placeholder}
-                        value={pendingMetricValues[pm.metricaId] || ""}
-                        onChange={(e) =>
-                          setPendingMetricValues((prev) => ({
-                            ...prev,
-                            [pm.metricaId]: e.target.value,
-                          }))
-                        }
-                        style={{
-                          width: "100%",
-                          padding: "0.625rem 0.75rem",
-                          borderRadius: "8px",
-                          border: "1px solid #cbd5e1",
-                          fontSize: "0.875rem",
-                        }}
-                      />
-                    )}
+                    <MetricValueInput
+                      id={inputId}
+                      ariaLabel={cleanTitle}
+                      value={pendingMetricValues[pm.metricaId] || ""}
+                      tipo={pm.tipo}
+                      unidade={pm.unidade}
+                      campoStrava={pm.campoStrava}
+                      disabled={savingPendingMetric}
+                      error={pendingMetricErrors[pm.metricaId]}
+                      onChange={(nextVal) => {
+                        setPendingMetricValues((prev) => ({
+                          ...prev,
+                          [pm.metricaId]: nextVal,
+                        }));
+                        setPendingMetricErrors((prev) => ({
+                          ...prev,
+                          [pm.metricaId]: "",
+                        }));
+                      }}
+                    />
                     <span className="pending-hint">
-                      Tipo {metricLabels[pm.tipo] || pm.tipo} ·{" "}
-                      {pm.obrigatoria ? "Obrigatória" : "Opcional"} · fica visível para o(a)
-                      aluno(a) após salvar
+                      {pm.unidade || metricLabels[pm.tipo] || pm.tipo} ·{" "}
+                      {pm.obrigatoria ? "Obrigatória" : "Opcional"} · fica visível para o aluno
+                      após salvar
                     </span>
                   </div>
                 );
@@ -532,7 +552,8 @@ export default function StudentSessionDetail() {
                 <div>
                   <h3>Seu feedback na validação</h3>
                   <p>
-                    Enviado em {formatDateTime(personalFeedback.dataCriacao)} · a aluna foi notificada
+                    Enviado em {formatDateTime(personalFeedback.dataCriacao)} · o aluno foi
+                    notificado
                   </p>
                 </div>
               </header>
@@ -588,7 +609,7 @@ export default function StudentSessionDetail() {
                   <CheckCircle2 size={16} />
                 </div>
                 <div className="timeline-text">
-                  <strong>Concluída pela aluna</strong>
+                  <strong>Concluída pelo aluno</strong>
                   <span>{formatDateTime(session.dataRegistro)}</span>
                 </div>
               </div>
@@ -611,14 +632,14 @@ export default function StudentSessionDetail() {
             </div>
           </section>
 
-          {/* Card: Observação da aluna */}
+          {/* Card: Observação do aluno */}
           {session.observacoes && (
             <section
               className="workspace-card session-detail__card"
-              aria-label="Observação da aluna"
+              aria-label="Observação do aluno"
             >
               <header className="session-detail__card-header">
-                <h2>Observação da aluna</h2>
+                <h2>Observação do aluno</h2>
               </header>
 
               <div className="session-detail__student-quote">

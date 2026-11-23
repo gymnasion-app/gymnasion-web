@@ -5,10 +5,8 @@ export type { CampoStrava };
 export type TipoMetrica =
   | 'NUMERICO'
   | 'TEMPO'
-  | 'TEMPO_CRONOMETRO'
   | 'FREQUENCIA_CARDIACA'
-  | 'TEXTO'
-  | 'TEXTO_OBSERVACAO';
+  | 'TEXTO';
 
 export type ResponsavelPreenchimento = 'ALUNO' | 'PERSONAL' | 'AMBOS';
 
@@ -16,6 +14,7 @@ export interface MetricaResponseDTO {
   id: string;
   titulo: string;
   tipo: TipoMetrica;
+  unidade?: string | null;
   modalidadeId: number;
   nomeModalidade?: string;
   modalidade?: { id: number; nome: string };
@@ -23,15 +22,15 @@ export interface MetricaResponseDTO {
   quemPreenche?: ResponsavelPreenchimento;
   campoStrava?: CampoStrava | null;
   ativo?: boolean;
-  descontinuada?: boolean;
   quantidadeAlunosComRegistros?: number;
-  quantidadeAlunosComRegistro?: number;
+  possuiHistorico?: boolean;
 }
 
 export interface CriarMetricaRequestDTO {
   modalidadeId: number;
   titulo: string;
   tipo: TipoMetrica;
+  unidade?: string | null;
   obrigatoria?: boolean;
   quemPreenche?: ResponsavelPreenchimento;
   campoStrava?: CampoStrava | null;
@@ -40,6 +39,7 @@ export interface CriarMetricaRequestDTO {
 export interface AtualizarMetricaRequestDTO {
   titulo: string;
   tipo: TipoMetrica;
+  unidade?: string | null;
   obrigatoria?: boolean;
   quemPreenche?: ResponsavelPreenchimento;
   campoStrava?: CampoStrava | null;
@@ -50,13 +50,10 @@ export interface MensagemResponseDTO {
 }
 
 export function getMetricStudentCount(m: MetricaResponseDTO): number {
-  return m.quantidadeAlunosComRegistro ?? m.quantidadeAlunosComRegistros ?? 0;
+  return m.quantidadeAlunosComRegistros ?? 0;
 }
 
 export function isMetricActive(m: MetricaResponseDTO): boolean {
-  if (typeof m.descontinuada === 'boolean') {
-    return !m.descontinuada;
-  }
   if (typeof m.ativo === 'boolean') {
     return m.ativo;
   }

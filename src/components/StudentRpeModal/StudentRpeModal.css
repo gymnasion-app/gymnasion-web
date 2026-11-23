@@ -1,5 +1,8 @@
 .student-rpe-modal {
-  width: min(512px, calc(100vw - 32px));
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(92vh, 860px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   margin: auto;
   padding: 24px;
   border: 1px solid var(--color-border);
@@ -293,8 +296,173 @@
   border-radius: 14px;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
-  max-height: 340px;
+  max-height: 460px;
   overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.student-rpe-modal__strava-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.student-rpe-modal__strava-box--dashed {
+  border-style: dashed;
+  border-color: #cbd5e1;
+}
+
+.student-rpe-modal__strava-box--expired {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #92400e;
+  font-size: 13px;
+}
+
+.student-rpe-modal__strava-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+
+.student-rpe-modal__strava-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 14px;
+  color: #0f172a;
+}
+
+.student-rpe-modal__strava-chip {
+  font-size: 12px;
+  background: rgba(252, 82, 0, 0.1);
+  color: #fc5200;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-weight: 600;
+}
+
+.student-rpe-modal__strava-control label {
+  display: block;
+  font-size: 12px;
+  color: #64748b;
+  margin-bottom: 4px;
+}
+
+.student-rpe-modal__strava-control select {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  font-size: 13px;
+  background: #ffffff;
+  color: #0f172a;
+}
+
+.student-rpe-modal__strava-prompt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.student-rpe-modal__strava-invite {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #475569;
+}
+
+.student-rpe-modal__strava-link {
+  background: none;
+  border: none;
+  color: #fc5200;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  text-decoration: underline;
+  padding: 0;
+}
+
+.student-rpe-modal__strava-muted {
+  font-size: 12.5px;
+  color: #64748b;
+  margin: 6px 0 0;
+}
+
+.student-rpe-modal__strava-warn {
+  font-size: 12.5px;
+  color: #b45309;
+  margin: 6px 0 0;
+  font-weight: 500;
+}
+
+.student-rpe-modal__strava-missing-hint {
+  font-size: 12px;
+  color: #d97706;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.student-rpe-modal__personal-metrics-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.student-rpe-modal__personal-metric-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.student-rpe-modal__personal-metric-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.student-rpe-modal__personal-metric-row .is-required {
+  color: #ef4444;
+}
+
+.student-rpe-modal__personal-pending {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.student-rpe-modal__rpe-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.student-rpe-modal__rpe-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.student-rpe-modal__rpe-header strong {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-ink-900);
+}
+
+.student-rpe-modal__rpe-header span {
+  font-size: 12px;
+  color: var(--color-ink-500);
 }
 
 .student-rpe-modal__metrics-head {

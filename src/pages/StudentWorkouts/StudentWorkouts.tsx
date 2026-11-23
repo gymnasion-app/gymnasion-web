@@ -20,6 +20,11 @@ import {
   sportKeyFromName,
 } from "../../features/studentArea/studentAreaModel";
 import { parseAtividades } from "../../utils/activityParser";
+import { formatDurationMinutes } from "../../utils/durationFormat";
+import {
+  formatMetricDisplayValue,
+  stripDuplicateUnitSuffix,
+} from "../../utils/metricValueFormat";
 import "./StudentWorkouts.css";
 
 type SessionStatusFilter = "todas" | "pendentes" | "finalizadas";
@@ -472,7 +477,7 @@ export default function StudentWorkouts() {
                       {sessao.duracaoPlanejada && (
                         <div className="student-workouts__duration-badge" title="Duração estimada">
                           <Clock size={14} aria-hidden="true" />
-                          <span>{sessao.duracaoPlanejada} min</span>
+                          <span>{formatDurationMinutes(sessao.duracaoPlanejada)}</span>
                         </div>
                       )}
 
@@ -538,7 +543,7 @@ export default function StudentWorkouts() {
                           {typeof sessao.duracaoReal === "number" && (
                             <div className="student-workouts__result-pill">
                               <span>Duração real</span>
-                              <strong>{sessao.duracaoReal} min</strong>
+                              <strong>{formatDurationMinutes(sessao.duracaoReal)}</strong>
                             </div>
                           )}
                           {typeof sessao.rpe === "number" && (
@@ -549,10 +554,9 @@ export default function StudentWorkouts() {
                           )}
                           {sessao.resultados?.map((res) => (
                             <div key={res.metricaId} className="student-workouts__result-pill">
-                              <span>{res.titulo}</span>
+                              <span>{stripDuplicateUnitSuffix(res.titulo, res.unidade)}</span>
                               <strong>
-                                {res.valor}
-                                {res.unidade ? ` ${res.unidade}` : ""}
+                                {formatMetricDisplayValue(res.valor, res.tipo, res.unidade)}
                               </strong>
                             </div>
                           ))}

@@ -37,6 +37,7 @@ import {
 } from "../../features/routines/routineModel";
 import { getPreenchimentoLabel } from "../../features/metrics/metricModel";
 import { authError } from "../../utils/authError";
+import { formatDurationMinutes, parseDurationToMinutes } from "../../utils/durationFormat";
 import {
   buildSessionCardPreview,
   parseAtividades,
@@ -89,7 +90,7 @@ const QUICK_BLOCK_PRESETS = [
   },
 ];
 
-const DURATION_PRESETS = ["30 min", "45 min", "50 min", "60 min", "75 min", "90 min"];
+const DURATION_PRESETS = ["30 min", "45 min", "50 min", "1h", "1h 15min", "1h 30min"];
 
 const FORMAT_SNIPPETS = [
   { label: "• Tópico", text: "\n• " },
@@ -465,7 +466,7 @@ export default function RoutineSessionPlanner() {
 
     setSessionName(parsed.sessionName || preview.headline || "");
     if (sess.duracao) {
-      setDuration(`${sess.duracao} min`);
+      setDuration(formatDurationMinutes(sess.duracao));
     }
     setOrientations(parsed.orientations || "");
 
@@ -529,9 +530,9 @@ export default function RoutineSessionPlanner() {
       return;
     }
 
-    const durMin = parseInt(duration.replace(/\D/g, ""), 10);
-    if (!durMin || durMin < 1) {
-      toast.error("A duração deve ser de no mínimo 1 minuto.");
+    const durMin = parseDurationToMinutes(duration);
+    if (!durMin || durMin < 1 || durMin > 1440) {
+      toast.error("Informe uma duração válida (ex: 45 min ou 1h 20min, até 1440 min).");
       return;
     }
 
@@ -876,7 +877,10 @@ export default function RoutineSessionPlanner() {
                         key={preset}
                         type="button"
                         className={`duration-pill ${
-                          duration.trim().toLowerCase() === preset ? "is-selected" : ""
+                          parseDurationToMinutes(duration) !== null &&
+                          parseDurationToMinutes(duration) === parseDurationToMinutes(preset)
+                            ? "is-selected"
+                            : ""
                         }`}
                         onClick={() => setDuration(preset)}
                       >
@@ -1309,7 +1313,11 @@ export default function RoutineSessionPlanner() {
                               selectedMetricIds.size === 1 ? "métrica" : "métricas"
                             }`
                           : "apenas RPE e duração"}{" "}
-                        · {duration || "45 min"} · {formatDateBrWithWeekday(plannedDate)}
+                        ·{" "}
+                        {parseDurationToMinutes(duration)
+                          ? formatDurationMinutes(parseDurationToMinutes(duration))
+                          : duration || "45 min"}{" "}
+                        · {formatDateBrWithWeekday(plannedDate)}
                       </span>
                     </div>
 
@@ -1390,7 +1398,11 @@ export default function RoutineSessionPlanner() {
                 </div>
                 <div className="workload-kpi">
                   <span>Volume total</span>
-                  <strong>{weekStats.totalMinutes} min</strong>
+                  <strong>
+                    {weekStats.totalMinutes > 0
+                      ? formatDurationMinutes(weekStats.totalMinutes)
+                      : "0 min"}
+                  </strong>
                 </div>
                 <div className="workload-kpi">
                   <span>Executadas</span>
@@ -1578,7 +1590,7 @@ export default function RoutineSessionPlanner() {
                               </span>
                               {sess.duracao && (
                                 <span>
-                                  <Clock size={13} /> {sess.duracao} min
+                                  <Clock size={13} /> {formatDurationMinutes(sess.duracao)}
                                 </span>
                               )}
                               {preview.blocks.length > 0 && (

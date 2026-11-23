@@ -1,23 +1,17 @@
 import type { MetricaResponseDTO, ResponsavelPreenchimento, TipoMetrica } from "../../types/metric";
 import type { ModalidadeResponseDTO } from "../../types/modalidade";
 import type { CampoStrava } from "../../types/strava";
+import { normalizeTextAscii, normalizeTipo as normalizeCanonicalTipo } from "../../utils/metricValueFormat";
 
 export function normalizeText(text: string): string {
-  return text
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
+  return normalizeTextAscii(text);
 }
 
 export function getMetricStudentCount(m: MetricaResponseDTO): number {
-  return m.quantidadeAlunosComRegistro ?? m.quantidadeAlunosComRegistros ?? 0;
+  return m.quantidadeAlunosComRegistros ?? 0;
 }
 
 export function isMetricActive(m: MetricaResponseDTO): boolean {
-  if (typeof m.descontinuada === "boolean") {
-    return !m.descontinuada;
-  }
   if (typeof m.ativo === "boolean") {
     return m.ativo;
   }
@@ -31,19 +25,13 @@ export function getPreenchimentoLabel(quem?: ResponsavelPreenchimento): string {
 }
 
 export function normalizeTipo(tipo: TipoMetrica | string): "NUMERICO" | "TEMPO" | "FREQUENCIA_CARDIACA" | "TEXTO" {
-  if (tipo === "TEMPO_CRONOMETRO" || tipo === "TEMPO") return "TEMPO";
-  if (tipo === "TEXTO_OBSERVACAO" || tipo === "TEXTO") return "TEXTO";
-  if (tipo === "FREQUENCIA_CARDIACA") return "FREQUENCIA_CARDIACA";
-  return "NUMERICO";
+  return normalizeCanonicalTipo(tipo);
 }
 
 export function toBackendTipoMetrica(
   tipo: TipoMetrica | string
 ): "FREQUENCIA_CARDIACA" | "TEXTO" | "TEMPO" | "NUMERICO" {
-  if (tipo === "TEMPO_CRONOMETRO" || tipo === "TEMPO") return "TEMPO";
-  if (tipo === "TEXTO_OBSERVACAO" || tipo === "TEXTO") return "TEXTO";
-  if (tipo === "FREQUENCIA_CARDIACA") return "FREQUENCIA_CARDIACA";
-  return "NUMERICO";
+  return normalizeCanonicalTipo(tipo);
 }
 
 export interface MetricTypeOption {
@@ -205,8 +193,8 @@ export function getMetricTypeBadgeStyle(tipo: TipoMetrica | string): {
         bg: "#eff8ff",
         color: "#175cd3",
         border: "#b2ddff",
-        label: "Tempo / Cronômetro",
-        unitHint: "Formato mm:ss",
+        label: "Tempo / Ritmo",
+        unitHint: "mm:ss, hh:mm:ss ou pace",
       };
     case "FREQUENCIA_CARDIACA":
       return {
@@ -346,6 +334,7 @@ export interface MetricPresetItem {
   titulo: string;
   descricao: string;
   tipo: TipoMetrica;
+  unidade: string | null;
   obrigatoria: boolean;
   quemPreenche: ResponsavelPreenchimento;
   campoStrava: CampoStrava;
@@ -360,6 +349,7 @@ interface RawPresetDefinition {
   titulo: string;
   descricao: string;
   tipo: TipoMetrica;
+  unidade: string | null;
   obrigatoria: boolean;
   quemPreenche: ResponsavelPreenchimento;
   campoStrava: CampoStrava;
@@ -373,9 +363,10 @@ const MARKET_PRESET_DEFINITIONS: RawPresetDefinition[] = [
     titulo: "Ritmo médio 100m",
     descricao: "Pace de nado a cada 100m (padrão CSS / TrainingPeaks).",
     tipo: "TEMPO",
+    unidade: "min/100m",
     obrigatoria: true,
     quemPreenche: "AMBOS",
-    campoStrava: "TEMPO_MOVIMENTO",
+    campoStrava: "RITMO_MEDIO",
   },
   {
     sportKeyword: "natacao",
@@ -383,6 +374,7 @@ const MARKET_PRESET_DEFINITIONS: RawPresetDefinition[] = [
     titulo: "Distância total (m)",
     descricao: "Volume total nadado na sessão em metros.",
     tipo: "NUMERICO",
+    unidade: "m",
     obrigatoria: true,
     quemPreenche: "AMBOS",
     campoStrava: "DISTANCIA_METROS",
@@ -393,6 +385,7 @@ const MARKET_PRESET_DEFINITIONS: RawPresetDefinition[] = [
     titulo: "Braçadas por piscina (SWOLF)",
     descricao: "Contagem média de ciclos de braçada por comprimento de piscina.",
     tipo: "NUMERICO",
+    unidade: null,
     obrigatoria: false,
     quemPreenche: "ALUNO",
     campoStrava: "NENHUM",
@@ -403,6 +396,7 @@ const MARKET_PRESET_DEFINITIONS: RawPresetDefinition[] = [
     titulo: "FC média na água",
     descricao: "Frequência cardíaca média aferida durante a série principal.",
     tipo: "FREQUENCIA_CARDIACA",
+    unidade: "bpm",
     obrigatoria: false,
     quemPreenche: "AMBOS",
     campoStrava: "FREQUENCIA_CARDIACA_MEDIA",
@@ -413,7 +407,8 @@ const MARKET_PRESET_DEFINITIONS: RawPresetDefinition[] = [
     fallbackSportName: "Corrida de Rua",
     titulo: "Pace médio (min/km)",
     descricao: "Ritmo médio por quilômetro importado automaticamente do Strava.",
-    tipo: "TEXTO",
+    tipo: "TEMPO",
+    unidade: "min/km",
     obrigatoria: true,
     quemPreenche: "AMBOS",
     campoStrava: "RITMO_MEDIO",
@@ -424,6 +419,7 @@ const MARKET_PRESET_DEFINITIONS: RawPresetDefinition[] = [
     titulo: "Distância percorrida (km)",
     descricao: "Quilometragem total da sessão de corrida.",
     tipo: "NUMERICO",
+    unidade: "km",
     obrigatoria: true,
     quemPreenche: "AMBOS",
     campoStrava: "DISTANCIA_KM",
@@ -434,6 +430,7 @@ const MARKET_PRESET_DEFINITIONS: RawPresetDefinition[] = [
     titulo: "Cadência média (spm)",
     descricao: "Passadas por minuto para avaliação biomecânica de corrida.",
     tipo: "NUMERICO",
+    unidade: "spm",
     obrigatoria: false,
     quemPreenche: "AMBOS",
     campoStrava: "CADENCIA_MEDIA",
@@ -444,6 +441,7 @@ const MARKET_PRESET_DEFINITIONS: RawPresetDefinition[] = [
     titulo: "Ganho de elevação (m)",
     descricao: "Altimetria acumulada em treinos de subida ou trail run.",
     tipo: "NUMERICO",
+    unidade: "m",
     obrigatoria: false,
     quemPreenche: "AMBOS",
     campoStrava: "ELEVACAO_GANHO_METROS",
@@ -455,6 +453,7 @@ const MARKET_PRESET_DEFINITIONS: RawPresetDefinition[] = [
     titulo: "Carga máxima (kg)",
     descricao: "Peso utilizado na série principal ou teste de carga (1RM / PR).",
     tipo: "NUMERICO",
+    unidade: "kg",
     obrigatoria: true,
     quemPreenche: "AMBOS",
     campoStrava: "NENHUM",
@@ -465,6 +464,7 @@ const MARKET_PRESET_DEFINITIONS: RawPresetDefinition[] = [
     titulo: "Percepção de esforço (RPE 1-10)",
     descricao: "Escala subjetiva de esforço de Borg/RIR ao final do treino.",
     tipo: "NUMERICO",
+    unidade: null,
     obrigatoria: true,
     quemPreenche: "ALUNO",
     campoStrava: "NENHUM",
@@ -475,6 +475,7 @@ const MARKET_PRESET_DEFINITIONS: RawPresetDefinition[] = [
     titulo: "Repetições em reserva (RIR)",
     descricao: "Quantas repetições restavam antes da falha concêntrica.",
     tipo: "NUMERICO",
+    unidade: "reps",
     obrigatoria: false,
     quemPreenche: "ALUNO",
     campoStrava: "NENHUM",
@@ -485,6 +486,7 @@ const MARKET_PRESET_DEFINITIONS: RawPresetDefinition[] = [
     titulo: "Sensação pós-treino / Dor articular",
     descricao: "Relato qualitativo sobre fadiga, pump ou desconfortos.",
     tipo: "TEXTO",
+    unidade: null,
     obrigatoria: false,
     quemPreenche: "AMBOS",
     campoStrava: "NENHUM",
@@ -496,6 +498,7 @@ const MARKET_PRESET_DEFINITIONS: RawPresetDefinition[] = [
     titulo: "Aproveitamento de 1º saque (%)",
     descricao: "Percentual de primeiros serviços convertidos em quadra.",
     tipo: "NUMERICO",
+    unidade: "%",
     obrigatoria: true,
     quemPreenche: "AMBOS",
     campoStrava: "NENHUM",
@@ -506,6 +509,7 @@ const MARKET_PRESET_DEFINITIONS: RawPresetDefinition[] = [
     titulo: "Tempo em quadra",
     descricao: "Duração efetiva da sessão técnica ou partida treino.",
     tipo: "TEMPO",
+    unidade: "hh:mm:ss",
     obrigatoria: true,
     quemPreenche: "AMBOS",
     campoStrava: "TEMPO_MOVIMENTO",
@@ -516,6 +520,7 @@ const MARKET_PRESET_DEFINITIONS: RawPresetDefinition[] = [
     titulo: "Erros não forçados",
     descricao: "Contagem de erros não forçados em simulações de set.",
     tipo: "NUMERICO",
+    unidade: null,
     obrigatoria: false,
     quemPreenche: "PERSONAL",
     campoStrava: "NENHUM",
@@ -527,6 +532,7 @@ const MARKET_PRESET_DEFINITIONS: RawPresetDefinition[] = [
     titulo: "Time Cap / Tempo do WOD",
     descricao: "Tempo de conclusão de treinos For Time no formato mm:ss.",
     tipo: "TEMPO",
+    unidade: "mm:ss",
     obrigatoria: true,
     quemPreenche: "AMBOS",
     campoStrava: "TEMPO_MOVIMENTO",
@@ -537,6 +543,7 @@ const MARKET_PRESET_DEFINITIONS: RawPresetDefinition[] = [
     titulo: "Total de Rounds / Reps (AMRAP)",
     descricao: "Pontuação total de repetições ou rounds atingidos no AMRAP.",
     tipo: "NUMERICO",
+    unidade: "reps",
     obrigatoria: true,
     quemPreenche: "AMBOS",
     campoStrava: "NENHUM",
@@ -548,6 +555,7 @@ const MARKET_PRESET_DEFINITIONS: RawPresetDefinition[] = [
     titulo: "Potência média (Watts)",
     descricao: "Produção média de potência no pedal sincronizada via Strava.",
     tipo: "NUMERICO",
+    unidade: "W",
     obrigatoria: true,
     quemPreenche: "AMBOS",
     campoStrava: "POTENCIA_MEDIA_WATTS",
@@ -558,6 +566,7 @@ const MARKET_PRESET_DEFINITIONS: RawPresetDefinition[] = [
     titulo: "Velocidade média (km/h)",
     descricao: "Velocidade média da sessão de ciclismo indoor ou estrada.",
     tipo: "NUMERICO",
+    unidade: "km/h",
     obrigatoria: true,
     quemPreenche: "AMBOS",
     campoStrava: "VELOCIDADE_MEDIA_KMH",
@@ -569,6 +578,7 @@ const MARKET_PRESET_DEFINITIONS: RawPresetDefinition[] = [
     titulo: "Controle de core e alinhamento",
     descricao: "Observação clínica do instrutor sobre estabilidade e postura.",
     tipo: "TEXTO",
+    unidade: null,
     obrigatoria: true,
     quemPreenche: "PERSONAL",
     campoStrava: "NENHUM",
@@ -634,6 +644,7 @@ export function getMarketMetricPresets(
       titulo: raw.titulo,
       descricao: raw.descricao,
       tipo: raw.tipo,
+      unidade: raw.unidade,
       obrigatoria: raw.obrigatoria,
       quemPreenche: raw.quemPreenche,
       campoStrava: raw.campoStrava,

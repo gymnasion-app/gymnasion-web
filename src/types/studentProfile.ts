@@ -28,5 +28,6 @@ export interface SessionExecution {
   dataReal: string;
   duracao: number | null;
   nivelCansaco: number | null;
+  stravaAtividadeId?: string | null;
   resultados: { metricaId: string; valor: string }[];
 }

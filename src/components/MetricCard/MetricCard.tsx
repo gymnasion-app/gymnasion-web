@@ -1,5 +1,6 @@
 import React from 'react';
-import { MetricaResponseDTO } from '../../types/metric';
+import { getMetricStudentCount, MetricaResponseDTO } from '../../types/metric';
+import { normalizeTipo, stripDuplicateUnitSuffix } from '../../utils/metricValueFormat';
 import './MetricCard.css';
 
 interface MetricCardProps {
@@ -8,17 +9,35 @@ interface MetricCardProps {
   onDelete: () => void;
 }
 
+function metricTypeLabel(tipo: string): string {
+  switch (normalizeTipo(tipo)) {
+    case 'TEMPO':
+      return 'Tempo / Ritmo';
+    case 'FREQUENCIA_CARDIACA':
+      return 'Frequência cardíaca';
+    case 'TEXTO':
+      return 'Texto';
+    default:
+      return 'Numérico';
+  }
+}
+
 export const MetricCard: React.FC<MetricCardProps> = ({ metrica, onEdit, onDelete }) => {
   const descontinuada = !metrica.ativo;
+  const studentCount = getMetricStudentCount(metrica);
+  const cleanTitle = stripDuplicateUnitSuffix(metrica.titulo, metrica.unidade);
+  const typeSummary = metrica.unidade
+    ? `${metricTypeLabel(metrica.tipo)} · ${metrica.unidade}`
+    : metricTypeLabel(metrica.tipo);
 
   return (
     <article className={`metric-card${descontinuada ? ' metric-card--discontinued' : ''}`}>
       <span className="metric-card__sport">{metrica.nomeModalidade}</span>
-      <h3>{metrica.titulo}</h3>
-      <p>{metrica.tipo}</p>
+      <h3>{cleanTitle}</h3>
+      <p>{typeSummary}</p>
       <p className="metric-card__count">
-        {metrica.quantidadeAlunosComRegistros}{' '}
-        {metrica.quantidadeAlunosComRegistros === 1 ? 'aluno com registros' : 'alunos com registros'}
+        {studentCount}{' '}
+        {studentCount === 1 ? 'aluno com registros' : 'alunos com registros'}
       </p>
 
       {descontinuada ? (

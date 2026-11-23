@@ -358,6 +358,7 @@ export default function StudentProvider({ children }: { children: ReactNode }) {
       details?: {
         dataReal?: string;
         duracao?: number | null;
+        stravaAtividadeId?: string | null;
         resultados?: StudentWorkoutSession["resultados"];
         alreadySavedOnBackend?: boolean;
       }
@@ -369,8 +370,9 @@ export default function StudentProvider({ children }: { children: ReactNode }) {
         if (!details?.alreadySavedOnBackend) {
           await alunoService.registrarExecucao(rpeModalSessionId, {
             dataReal: realIso,
-            duracao: details?.duracao ?? 50,
+            duracao: details?.duracao ?? null,
             nivelCansaco: rpe,
+            stravaAtividadeId: details?.stravaAtividadeId ?? null,
             resultados: (details?.resultados || []).map((r) => ({
               metricaId: r.metricaId,
               valor: r.valor,
@@ -388,7 +390,8 @@ export default function StudentProvider({ children }: { children: ReactNode }) {
               rpe,
               formattedRealDate,
               details?.resultados,
-              details?.duracao
+              details?.duracao,
+              details?.stravaAtividadeId
             ),
           }))
         );

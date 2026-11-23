@@ -5,12 +5,9 @@
 .dashboard-evolution__controls { position: absolute; right: 20px; top: 20px; display: flex; gap: 4px; background: var(--color-background); padding: 4px; border-radius: 8px; }
 .dashboard-evolution__controls button { border: 0; background: transparent; color: var(--color-text-muted); font-size: 11px; padding: 6px 8px; border-radius: 6px; cursor: pointer; }
 .dashboard-evolution__controls button[aria-pressed=true] { background: var(--color-surface); color: var(--color-text); box-shadow: var(--shadow-sm); }
-.dashboard-evolution__legend { display: flex; gap: 7px; align-items: center; font-size: 11px; color: var(--color-text-muted); }
-.dashboard-evolution__legend span { width: 8px; height: 8px; border-radius: 50%; background: var(--color-primary-500); }
-.dashboard-evolution svg { width: 100%; display: block; margin-top: 12px; }
-.dashboard-evolution svg text { fill: var(--color-ink-400); font-size: 10px; font-family: var(--font-family); }
 .dashboard-evolution details { font-size: 11px; color: var(--color-text-muted); margin-top: 8px; }
 .dashboard-evolution summary { cursor: pointer; }
 .dashboard-evolution table { width: 100%; text-align: left; margin-top: 12px; border-collapse: collapse; }
 .dashboard-evolution th,.dashboard-evolution td { padding: 6px; border-bottom: 1px solid var(--color-border); }
 @media(max-width:1200px) { .dashboard-evolution > header { padding-right: 0; margin-bottom: 12px; } .dashboard-evolution__controls { position: static; width: fit-content; margin-bottom: 16px; } }
+.dashboard-evolution .line-chart { margin-top: 12px; }

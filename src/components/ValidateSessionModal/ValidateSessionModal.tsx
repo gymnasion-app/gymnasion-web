@@ -7,6 +7,7 @@ import Checkbox from "../Checkbox/Checkbox";
 import Badge from "../Badge/Badge";
 import { sessionDetailService } from "../../services/sessionDetailService";
 import { authError } from "../../utils/authError";
+import { formatMetricDisplayValue } from "../../utils/metricValueFormat";
 import type { DesempenhoDetalheResponse } from "../../types/sessionDetail";
 import "./ValidateSessionModal.css";
 
@@ -54,7 +55,7 @@ export default function ValidateSessionModal({
       }
 
       toast.success(
-        `Execução validada · A sessão de ${studentName} foi validada${notifyStudent ? " e ela foi notificada" : ""}.`
+        `Execução validada · A sessão de ${studentName} foi validada${notifyStudent ? " e a notificação foi enviada" : ""}.`
       );
       onValidated();
       onClose();
@@ -103,7 +104,9 @@ export default function ValidateSessionModal({
                     {m.titulo} ({m.obrigatoria ? "Obrigatória" : "Opcional"})
                   </span>
                   {m.valor ? (
-                    <strong className="validate-modal__value">{m.valor}</strong>
+                    <strong className="validate-modal__value">
+                      {formatMetricDisplayValue(m.valor, m.tipo, m.unidade)}
+                    </strong>
                   ) : isPersonalPending ? (
                     <Badge tone="warning">Pendente · personal</Badge>
                   ) : (
@@ -132,7 +135,7 @@ export default function ValidateSessionModal({
           )}
 
           <div className="validate-modal__feedback-group">
-            <label htmlFor="validate-feedback">Feedback para a aluna (opcional)</label>
+            <label htmlFor="validate-feedback">Feedback (opcional)</label>
             <textarea
               id="validate-feedback"
               rows={3}
@@ -140,12 +143,12 @@ export default function ValidateSessionModal({
               value={feedback}
               onChange={(e) => setFeedback(e.target.value)}
             />
-            <span className="validate-modal__hint">Fica registrado nas observações e feedbacks da aluna</span>
+            <span className="validate-modal__hint">Fica registrado nas observações e feedbacks do treino</span>
           </div>
 
           <div className="validate-modal__notify">
             <Checkbox
-              label="Notificar a aluna sobre a validação"
+              label="Enviar notificação sobre a validação"
               checked={notifyStudent}
               onChange={(e) => setNotifyStudent(e.target.checked)}
             />
@@ -156,14 +159,14 @@ export default function ValidateSessionModal({
           <div className="validate-modal__footer-compliance">
             <Shield size={16} />
             <span>
-              Registrado em seu nome, com data e hora. A conclusão da aluna não é alterada.
+              Registrado em seu nome, com data e hora. O registro original do aluno não é alterado.
             </span>
           </div>
           <div className="validate-modal__footer-actions">
-            <Button variant="secondary" onClick={onClose} disabled={loading}>
+            <Button type="button" variant="secondary" onClick={onClose} disabled={loading}>
               Cancelar
             </Button>
-            <Button variant="primary" onClick={handleValidate} loading={loading}>
+            <Button type="button" variant="primary" onClick={handleValidate} loading={loading}>
               Validar execução
             </Button>
           </div>

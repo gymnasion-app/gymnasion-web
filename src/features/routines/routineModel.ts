@@ -229,20 +229,16 @@ export function validateReuseRoutinePayload(payload: Partial<ReutilizarRotinaPay
 
 export const metricLabels: Record<TipoMetrica, string> = {
   NUMERICO: "Numérico / Repetições",
-  TEMPO: "Tempo / Cronômetro",
-  TEMPO_CRONOMETRO: "Tempo / Cronômetro",
+  TEMPO: "Tempo / Ritmo",
   FREQUENCIA_CARDIACA: "Frequência cardíaca",
   TEXTO: "Texto / Observação",
-  TEXTO_OBSERVACAO: "Texto / Observação",
 };
 
 export const metricIcons: Record<TipoMetrica, string> = {
   NUMERICO: "imgIconHash",
   TEMPO: "imgIconClock",
-  TEMPO_CRONOMETRO: "imgIconClock",
   FREQUENCIA_CARDIACA: "imgIconHeart",
   TEXTO: "imgIconText",
-  TEXTO_OBSERVACAO: "imgIconText",
 };
 
 export const WEEK_DAYS = [1, 2, 3, 4, 5, 6, 7] as const;

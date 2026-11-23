@@ -6,7 +6,7 @@ import Badge from "../../components/Badge/Badge";
 import Button from "../../components/Button/Button";
 import SportTag from "../../components/SportTag/SportTag";
 import StudentModalityTabs from "../../components/StudentModalityTabs/StudentModalityTabs";
-import StudentSmoothChart from "../../components/StudentSmoothChart/StudentSmoothChart";
+import LineChart from "../../components/LineChart/LineChart";
 import { useStudentArea } from "../../features/studentArea/StudentContext";
 import { sportKeyFromName } from "../../features/studentArea/studentAreaModel";
 import { stravaService } from "../../services/stravaService";
@@ -14,27 +14,14 @@ import { STRAVA_STATUS_CHANGED } from "../../features/strava/connectWithPopup";
 import type { StravaStatusResponse } from "../../types/strava";
 import type { StudentExecutionMetricDTO } from "../../types/studentArea";
 import { parseAtividades } from "../../utils/activityParser";
+import { formatDurationMinutes } from "../../utils/durationFormat";
+import {
+  chartValueFormatter,
+  formatRpeValue,
+  parseMetricNumericValue,
+  stripDuplicateUnitSuffix,
+} from "../../utils/metricValueFormat";
 import "./AccountHome.css";
-
-function parseMetricNumericValue(raw: string): number | null {
-  const trimmed = raw.trim();
-  // Tempo hh:mm:ss -> segundos
-  const hmsMatch = /^(\d+):([0-5]\d):([0-5]\d)$/.exec(trimmed);
-  if (hmsMatch) {
-    return Number(hmsMatch[1]) * 3600 + Number(hmsMatch[2]) * 60 + Number(hmsMatch[3]);
-  }
-  // Tempo mm:ss -> segundos
-  const timeMatch = /^(\d{1,3}):([0-5]\d)$/.exec(trimmed);
-  if (timeMatch) {
-    return Number(timeMatch[1]) * 60 + Number(timeMatch[2]);
-  }
-  const numMatch = /-?\d+(?:[.,]\d+)?/.exec(trimmed);
-  if (numMatch) {
-    const n = Number(numMatch[0].replace(",", "."));
-    return Number.isFinite(n) ? n : null;
-  }
-  return null;
-}
 
 export default function AccountHome() {
   const location = useLocation();
@@ -175,36 +162,22 @@ export default function AccountHome() {
 
       if (entries.length > 0) {
         const lastEntry = entries[entries.length - 1];
-        const numericPoints = entries
-          .map((e) => e.num)
-          .filter((v): v is number => typeof v === "number");
-
-        let chartValues = [45, 65];
-        if (numericPoints.length >= 2) {
-          const min = Math.min(...numericPoints);
-          const max = Math.max(...numericPoints);
-          const span = max - min || 1;
-          chartValues = numericPoints.map((v) => Math.round(20 + ((v - min) / span) * 68));
-        } else if (numericPoints.length === 1) {
-          chartValues = [50, 68];
-        }
-
-        const chartLabels =
-          entries.length >= 2
-            ? entries.map((e) => e.label)
-            : ["Início", lastEntry.label];
+        const chartPoints = entries
+          .filter((e): e is { label: string; raw: string; num: number } => typeof e.num === "number")
+          .map((e) => ({ label: e.label, value: e.num }));
 
         return {
           hasData: true,
-          title: primaryMetric.titulo,
+          title: stripDuplicateUnitSuffix(primaryMetric.titulo, primaryMetric.unidade),
           subtitle: `${entries.length} ${
             entries.length === 1 ? "sessão registrada" : "sessões registradas"
           } na rotina`,
           latestValue: lastEntry.raw,
           unit: primaryMetric.unidade || "",
           badgeText: "Atualizado",
-          values: chartValues,
-          labels: chartLabels,
+          kind: "metric" as const,
+          tipo: primaryMetric.tipo,
+          points: chartPoints,
         };
       }
     }
@@ -213,14 +186,7 @@ export default function AccountHome() {
     const rpeSessions = completedSessions.filter((s) => typeof s.rpe === "number");
     if (rpeSessions.length > 0) {
       const lastRpe = rpeSessions[rpeSessions.length - 1];
-      const values =
-        rpeSessions.length >= 2
-          ? rpeSessions.map((s) => Math.round(((s.rpe || 5) / 10) * 85 + 10))
-          : [50, Math.round(((lastRpe.rpe || 5) / 10) * 85 + 10)];
-      const labels =
-        rpeSessions.length >= 2
-          ? rpeSessions.map((s) => `S${s.semana}·${s.numero}`)
-          : ["Início", `S${lastRpe.semana}·${lastRpe.numero}`];
+      const chartPoints = rpeSessions.map((s) => ({ label: `S${s.semana}·${s.numero}`, value: s.rpe as number }));
 
       return {
         hasData: true,
@@ -231,22 +197,26 @@ export default function AccountHome() {
         latestValue: `${lastRpe.rpe}/10`,
         unit: `média ${averageRpe}`,
         badgeText: "Registrado",
-        values,
-        labels,
+        kind: "rpe" as const,
+        tipo: null,
+        points: chartPoints,
       };
     }
 
     return {
       hasData: false,
-      title: primaryMetric ? primaryMetric.titulo : "Acompanhamento de métricas",
+      title: primaryMetric
+        ? stripDuplicateUnitSuffix(primaryMetric.titulo, primaryMetric.unidade)
+        : "Acompanhamento de métricas",
       subtitle: activeRoutine
         ? "Finalize sua primeira sessão para visualizar o gráfico de evolução"
         : "Nenhuma rotina ativa vinculada",
       latestValue: "—",
       unit: primaryMetric?.unidade || "",
       badgeText: "Aguardando registros",
-      values: [],
-      labels: [],
+      kind: "metric" as const,
+      tipo: null,
+      points: [] as { label: string; value: number }[],
     };
   }, [weeks, studentMetrics, averageRpe, activeRoutine]);
 
@@ -347,7 +317,9 @@ export default function AccountHome() {
                 <span className="student-panel__next-weekday">{nextSession.diaSemana}</span>
                 <strong className="student-panel__next-day">{nextSession.dataPlanejada}</strong>
                 <span className="student-panel__next-time">
-                  {nextSession.duracaoPlanejada ? `${nextSession.duracaoPlanejada} min` : "Treino"}
+                  {nextSession.duracaoPlanejada
+                    ? formatDurationMinutes(nextSession.duracaoPlanejada)
+                    : "Treino"}
                 </span>
               </div>
 
@@ -548,10 +520,19 @@ export default function AccountHome() {
               </div>
 
               <div className="student-panel__evolution-chart">
-                <StudentSmoothChart
-                  values={evolutionSummary.values}
-                  labels={evolutionSummary.labels}
-                  color="blue"
+                <LineChart
+                  compact
+                  height={170}
+                  points={evolutionSummary.points}
+                  formatValue={evolutionSummary.kind === "rpe" ? formatRpeValue : chartValueFormatter(evolutionSummary.tipo)}
+                  seriesLabel={
+                    evolutionSummary.kind === "rpe"
+                      ? "RPE por sessão"
+                      : `${evolutionSummary.title}${evolutionSummary.unit ? ` (${evolutionSummary.unit})` : ""}`
+                  }
+                  unitLabel={evolutionSummary.kind === "rpe" ? "RPE" : evolutionSummary.unit || undefined}
+                  yDomain={evolutionSummary.kind === "rpe" ? [0, 10] : undefined}
+                  color={evolutionSummary.kind === "rpe" ? "orange" : "blue"}
                   ariaLabel={`Gráfico de evolução de ${evolutionSummary.title}`}
                 />
               </div>
