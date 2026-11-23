@@ -463,9 +463,9 @@ export default function MetricValueInput({
             onBlur={() => handleSegmentBlur("ss")}
           />
 
-          {isPace && unidade && (
+          {unidade?.trim() && (
             <span className="mvi-unit-pill" aria-hidden="true">
-              {unidade}
+              {unidade.trim()}
             </span>
           )}
 
@@ -526,7 +526,7 @@ export default function MetricValueInput({
             onBlur={onBlur}
           />
           <span className="mvi-unit-pill" aria-hidden="true">
-            bpm
+            {unidade?.trim() || "bpm"}
           </span>
           {stravaBadge}
         </div>
@@ -565,6 +565,11 @@ export default function MetricValueInput({
             <span id={hintId} className="mvi-char-counter">
               {value.length}/255
             </span>
+            {unidade?.trim() && (
+              <span className="mvi-unit-pill" aria-hidden="true">
+                {unidade.trim()}
+              </span>
+            )}
             {stravaBadge}
           </div>
         </div>
